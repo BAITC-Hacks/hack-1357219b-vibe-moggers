@@ -1,7 +1,71 @@
 package main
 
-import "fmt"
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"vibe-moggers/backend/internal/config"
+	"vibe-moggers/backend/internal/database"
+	"vibe-moggers/backend/internal/server"
+)
 
 func main() {
-	fmt.Println("API server starting...")
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error("failed to load configuration", "error", err)
+		os.Exit(1)
+	}
+
+	db, err := database.Open(cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	httpServer := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           server.New(db, logger),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	serverErrors := make(chan error, 1)
+	go func() {
+		logger.Info("API server started", "address", httpServer.Addr)
+		serverErrors <- httpServer.ListenAndServe()
+	}()
+
+	shutdownSignal := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignal, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
+		if !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("API server stopped unexpectedly", "error", err)
+			os.Exit(1)
+		}
+	case sig := <-shutdownSignal:
+		logger.Info("shutdown signal received", "signal", sig.String())
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		logger.Error("graceful shutdown failed", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("API server stopped")
 }
