@@ -138,7 +138,7 @@ function example(id: string) {
           <RouterLink
             :to="{ path: '/start', query: { role: 'team', next: `/tasks/${task.id}#proposal` } }"
             class="button primary"
-            >Создать профиль и откликнуться <AppIcon name="ArrowRight" :size="17"
+            >Выбрать команду и откликнуться <AppIcon name="ArrowRight" :size="17"
           /></RouterLink>
         </div>
         <template v-if="store.isTeam && task.publishedAt">

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useWorkspace } from './stores/workspace'
 import AiAssistant from './components/AiAssistant.vue'
 import AppIcon from './components/AppIcon.vue'
+import RoleSwitcher from './components/RoleSwitcher.vue'
 const store = useWorkspace()
 const route = useRoute()
 onMounted(() => store.refresh())
@@ -46,23 +47,13 @@ onMounted(() => store.refresh())
       <header class="topbar">
         <span class="page-location">{{ route.meta.title }}</span>
         <div class="topbar-actions">
-          <RouterLink v-if="store.profile" to="/profile" class="profile-link">
-            <span class="actor-avatar"
-              ><AppIcon :name="store.isBusiness ? 'Building2' : 'Users'" :size="18"
-            /></span>
-            <span
-              ><small>{{ store.isBusiness ? 'Заказчик' : 'Исполнитель' }}</small
-              ><b>{{ store.profile.name }}</b></span
-            >
-          </RouterLink>
-          <RouterLink v-else to="/login" class="button secondary"
-            >Войти <AppIcon name="ArrowRight" :size="16"
-          /></RouterLink>
+          <RoleSwitcher />
+          <RouterLink to="/start" class="text-link">Сменить роль</RouterLink>
         </div>
       </header>
       <div v-if="store.mode === 'demo'" class="demo-strip">
         <AppIcon name="Globe" :size="14" /><span
-          >Пробная версия: задачи и профили сохраняются только в этом браузере.</span
+          >Демо-режим: выбранная роль и изменения сохраняются только в этом браузере.</span
         >
       </div>
       <main id="main" class="main-content" tabindex="-1">

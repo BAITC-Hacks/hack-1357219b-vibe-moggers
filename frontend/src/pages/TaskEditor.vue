@@ -18,6 +18,7 @@ import AppIcon from '../components/AppIcon.vue'
 import LeaveDialog from '../components/LeaveDialog.vue'
 import { validateForm } from '../composables/formControls'
 import ScorePanel from '../components/ScorePanel.vue'
+import VoiceRecorder from '../components/VoiceRecorder.vue'
 
 const store = useWorkspace()
 const route = useRoute()
@@ -259,7 +260,7 @@ onBeforeRouteLeave(() => !dirty.value || canLeave.value || (leaveDialog.value?.a
   <div v-else-if="!canEdit || (route.params.id && !task)" class="empty-state">
     <AppIcon name="ShieldCheck" :size="30" />
     <h2>{{ !canEdit ? 'Конструктор доступен владельцу задачи' : 'Не удалось открыть задачу' }}</h2>
-    <p>{{ error || 'Для размещения задачи нужен профиль заказчика.' }}</p>
+    <p>{{ error || 'Для размещения задачи выберите роль бизнеса.' }}</p>
     <RouterLink to="/catalog" class="button secondary">Вернуться в каталог</RouterLink>
   </div>
   <div v-else class="editor-layout">
@@ -329,6 +330,21 @@ onBeforeRouteLeave(() => !dirty.value || canLeave.value || (leaveDialog.value?.a
           <span>Без персональных и конфиденциальных данных</span
           ><span>{{ form.draft.length }}/6000</span>
         </div>
+        <div class="voice-interview-callout">
+          <span class="soft-icon blue"><AppIcon name="Mic" :size="19" /></span>
+          <div>
+            <b>Можно рассказать задачу голосом</b>
+            <p>
+              Запишите описание, проверьте текст — и AI подготовит вопросы именно по вашей задаче.
+            </p>
+          </div>
+          <VoiceRecorder
+            v-model="form.draft"
+            label="Записать описание"
+            :max-length="6000"
+            :context="`Описание бизнес-задачи «${form.title || 'без названия'}». Распознай речь на русском или казахском языке.`"
+          />
+        </div>
         <button
           v-if="store.mode === 'demo' && !task"
           type="button"
@@ -344,13 +360,7 @@ onBeforeRouteLeave(() => !dirty.value || canLeave.value || (leaveDialog.value?.a
               :name="busy ? 'LoaderCircle' : 'Sparkles'"
               :class="{ spin: busy }"
               :size="17"
-            />{{
-              busy
-                ? 'Готовим вопросы…'
-                : store.mode === 'demo'
-                  ? 'Получить вопросы'
-                  : 'Уточнить с AI'
-            }}</button
+            />{{ busy ? 'Готовим вопросы…' : 'Получить AI-вопросы' }}</button
           ><button
             class="button ghost"
             type="button"
@@ -386,6 +396,11 @@ onBeforeRouteLeave(() => !dirty.value || canLeave.value || (leaveDialog.value?.a
             maxlength="3000"
             placeholder="Что известно сейчас? Если информации нет, можно пропустить."
             :disabled="busy"
+          />
+          <VoiceRecorder
+            v-model="answers[question.id]"
+            label="Ответить голосом"
+            :context="`${question.text} Контекст задачи: ${form.draft.slice(0, 700)}`"
           />
         </div>
         <div class="editor-actions">

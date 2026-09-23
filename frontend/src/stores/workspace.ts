@@ -1,36 +1,32 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { account, logout } from '../services/session'
 import { DemoApi } from '../services/demo-api'
 import { HttpApi } from '../services/http-api'
 import type { LocalProfile, Task, Team } from '../domain/types'
 
 export const useWorkspace = defineStore('workspace', () => {
-  const actorId = ref('guest')
+  const actorId = ref(readActor())
   const demoApi = new DemoApi(() => actorId.value, localStorage)
   const liveApi = new HttpApi(() => actorId.value)
-  const localProfile = ref<LocalProfile | null>(null)
-  const profile = computed<LocalProfile | null>(() =>
-    account.value ? { ...account.value, id: account.value.actorId } : localProfile.value,
-  )
-  const api = computed(() =>
-    account.value || import.meta.env.VITE_DATA_MODE === 'api' ? liveApi : demoApi,
-  )
+  const api = computed(() => (import.meta.env.VITE_DATA_MODE === 'api' ? liveApi : demoApi))
   const mode = computed(() => api.value.mode)
-  try {
-    const saved = localStorage.getItem('qadam:profile')
-    if (saved && import.meta.env.VITE_DATA_MODE !== 'api')
-      localProfile.value = demoApi.getProfile(saved)
-  } catch {
-    /* Optional demo persistence. */
-  }
-  actorId.value = profile.value?.id ?? 'guest'
   const catalog = ref<Task[]>([])
   const mine = ref<Task[]>([])
   const teams = ref<Team[]>([])
   const loading = ref(false)
   const error = ref('')
   const loaded = ref(false)
+  const profile = computed<LocalProfile | null>(() => {
+    if (actorId.value === 'demo-business-1')
+      return { id: actorId.value, role: 'business', name: 'Бизнес Qadam' }
+    const team = teams.value.find((item) => item.id === actorId.value)
+    const fallbackName = presetTeamNames[actorId.value]
+    return team
+      ? { id: team.id, role: 'team', name: team.name }
+      : fallbackName
+        ? { id: actorId.value, role: 'team', name: fallbackName }
+        : null
+  })
   const isBusiness = computed(() => profile.value?.role === 'business')
   const isTeam = computed(() => profile.value?.role === 'team')
   const currentTeam = computed(() => teams.value.find((team) => team.id === actorId.value))
@@ -69,62 +65,24 @@ export const useWorkspace = defineStore('workspace', () => {
       if (request === requestId) loading.value = false
     }
   }
-  async function createProfile(role: LocalProfile['role'], name: string) {
-    if (!(api.value instanceof DemoApi))
-      throw new Error('Регистрация пока не подключена. Просмотр каталога доступен без профиля.')
-    const next = demoApi.registerProfile(role, name)
-    localProfile.value = next
-    actorId.value = next.id
+  async function selectActor(id: string) {
+    const allowed =
+      id === 'guest' || id === 'demo-business-1' || teams.value.some((t) => t.id === id)
+    if (!allowed) throw new Error('Выбранный демонстрационный профиль не найден.')
+    actorId.value = id
+    try {
+      if (id === 'guest') localStorage.removeItem('qadam:actor')
+      else localStorage.setItem('qadam:actor', id)
+    } catch {
+      notify('Роль выбрана, но браузер не сможет запомнить её после закрытия вкладки.', 'info')
+    }
     mine.value = []
-    try {
-      localStorage.setItem('qadam:profile', next.id)
-    } catch {
-      notify('Профиль создан, но браузер не сохранил вход. Не закрывайте вкладку.', 'info')
-    }
-    await refresh()
-  }
-  function savedProfile(role: LocalProfile['role']) {
-    return api.value instanceof DemoApi ? demoApi.savedProfile(role) : null
-  }
-  async function resumeProfile(role: LocalProfile['role']) {
-    const saved = savedProfile(role)
-    if (!saved) throw new Error('Локальный профиль не найден. Создайте новый.')
-    localProfile.value = saved
-    actorId.value = saved.id
-    try {
-      localStorage.setItem('qadam:profile', saved.id)
-    } catch {
-      /* Session remains usable. */
-    }
     await refresh()
   }
   async function leaveProfile() {
-    if (account.value) await logout()
-    localProfile.value = null
-    actorId.value = 'guest'
-    mine.value = []
-    try {
-      localStorage.removeItem('qadam:profile')
-    } catch {
-      /* Memory state still resets. */
-    }
-    await refresh()
+    await selectActor('guest')
   }
-  watch(account, () => {
-    localProfile.value = null
-    try {
-      localStorage.removeItem('qadam:profile')
-    } catch {
-      /* Optional demo persistence. */
-    }
-    actorId.value = profile.value?.id ?? 'guest'
-    mine.value = []
-    catalog.value = []
-    teams.value = []
-    void refresh()
-  })
   return {
-    account,
     liveApi,
     actorId,
     mode,
@@ -143,9 +101,24 @@ export const useWorkspace = defineStore('workspace', () => {
     notify,
     dismiss,
     refresh,
-    createProfile,
-    savedProfile,
-    resumeProfile,
+    selectActor,
     leaveProfile,
   }
 })
+
+function readActor() {
+  try {
+    const value = localStorage.getItem('qadam:actor')
+    return value === 'demo-business-1' || /^team-[1-5]$/.test(value || '') ? value! : 'guest'
+  } catch {
+    return 'guest'
+  }
+}
+
+const presetTeamNames: Record<string, string> = {
+  'team-1': 'Команда веб-разработки',
+  'team-2': 'Steppe Flow',
+  'team-3': 'Campus Builders',
+  'team-4': 'Route Lab',
+  'team-5': 'Agro Makers',
+}

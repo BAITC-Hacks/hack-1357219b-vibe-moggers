@@ -4,7 +4,7 @@ import { emptyFields } from '../domain/scoring'
 
 afterEach(() => vi.unstubAllGlobals())
 describe('REST adapter', () => {
-  it('uses session cookies without a client-selected identity', async () => {
+  it('sends the selected demonstration actor expected by the MVP backend', async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }))
@@ -13,7 +13,9 @@ describe('REST adapter', () => {
     expect(await api.listTasks({ industry: 'retail' })).toEqual([])
     expect(fetcher).toHaveBeenCalledWith(
       '/api/tasks?industry=retail',
-      expect.objectContaining({ credentials: 'include', headers: { Accept: 'application/json' } }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-Demo-Actor': 'team-2' }),
+      }),
     )
   })
   it('reports server errors instead of silently switching to synthetic data', async () => {
@@ -56,16 +58,14 @@ describe('REST adapter', () => {
 it('rejects prepared fallback questions as a live AI result', async () => {
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            data: { mode: 'fallback', questions: [], fieldSuggestions: [], warnings: [] },
-          }),
-          { status: 200 },
-        ),
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: { mode: 'fallback', questions: [], fieldSuggestions: [], warnings: [] },
+        }),
+        { status: 200 },
       ),
+    ),
   )
   await expect(
     new HttpApi(() => 'guest', '/api').analyze({

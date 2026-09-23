@@ -1,31 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { restoreSession } from './services/session'
 import { useWorkspace } from './stores/workspace'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/catalog' },
-    {
-      path: '/welcome',
-      component: () => import('./pages/Welcome.vue'),
-      meta: { title: 'Добро пожаловать' },
-    },
-    { path: '/login', component: () => import('./pages/Auth.vue'), meta: { title: 'Вход' } },
-    {
-      path: '/register',
-      component: () => import('./pages/Auth.vue'),
-      meta: { title: 'Регистрация' },
-    },
-    {
-      path: '/demo-profile',
-      component: () => import('./pages/Profile.vue'),
-      meta: { title: 'Пробный профиль' },
-    },
+    { path: '/welcome', redirect: '/start' },
+    { path: '/login', redirect: '/start' },
+    { path: '/register', redirect: '/start' },
+    { path: '/demo-profile', redirect: '/start' },
     {
       path: '/start',
-      redirect: (to) => ({ path: '/register', query: to.query }),
-      meta: { title: 'Начать работу' },
+      component: () => import('./pages/Profile.vue'),
+      meta: { title: 'Выбор роли' },
     },
     {
       path: '/profile',
@@ -84,29 +71,14 @@ export const router = createRouter({
     return target ? { el: target } : { top: 0 }
   },
 })
-router.beforeEach(async (to) => {
-  await restoreSession()
+router.beforeEach((to) => {
   const store = useWorkspace()
-  let intent = ''
-  try {
-    intent = sessionStorage.getItem('qadam:intent') || ''
-  } catch {
-    /* Optional preference. */
-  }
-  if (
-    !store.profile &&
-    !intent &&
-    !['/welcome', '/login', '/register', '/demo-profile', '/how-it-works'].includes(to.path) &&
-    !['business', 'team'].includes(String(to.query.role))
-  )
-    return { path: '/welcome', query: { next: to.fullPath } }
-  if (to.path === '/profile' && !store.profile) return '/login'
   const business =
     to.path === '/tasks/new' || to.path.endsWith('/edit') || to.path.startsWith('/business')
   const team = to.path === '/applications'
   if ((business && !store.isBusiness) || (team && !store.isTeam)) {
     return {
-      path: store.profile ? '/profile' : '/register',
+      path: '/start',
       query: { role: business ? 'business' : 'team', next: to.fullPath },
     }
   }

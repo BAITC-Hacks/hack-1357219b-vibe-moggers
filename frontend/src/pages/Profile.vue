@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspace } from '../stores/workspace'
 import AppIcon from '../components/AppIcon.vue'
-import type { LocalProfile } from '../domain/types'
+
 const route = useRoute()
 const router = useRouter()
 const store = useWorkspace()
-const role = ref<LocalProfile['role'] | null>(
-  route.query.role === 'business' ? 'business' : route.query.role === 'team' ? 'team' : null,
+const role = ref<'business' | 'team'>(
+  route.query.role === 'team' || store.isTeam ? 'team' : 'business',
 )
-const name = ref('')
-const nameInput = ref<HTMLInputElement | null>(null)
+const teamId = ref(store.isTeam ? store.actorId : '')
 const error = ref('')
 const busy = ref(false)
-const saved = computed(() => (role.value ? store.savedProfile(role.value) : null))
-function chooseRole(value: LocalProfile['role']) {
-  role.value = value
-  error.value = ''
-}
+
 const next = computed(() => {
   const value = typeof route.query.next === 'string' ? route.query.next : ''
   if (
@@ -28,190 +23,115 @@ const next = computed(() => {
     return value
   if (role.value === 'team' && /^\/(applications|tasks\/[^/?#]+(?:#proposal)?)$/.test(value))
     return value
-  return role.value === 'business' ? '/tasks/new' : '/catalog'
+  return role.value === 'business' ? '/business' : '/catalog'
 })
-async function submit() {
-  if (busy.value || !role.value) return
+
+watch(
+  () => store.teams,
+  (teams) => {
+    if (!teamId.value && teams.length) teamId.value = teams[0]!.id
+  },
+  { immediate: true },
+)
+
+onMounted(async () => {
+  if (!store.loaded) await store.refresh()
+})
+
+async function applyProfile() {
+  if (busy.value) return
   error.value = ''
-  if (name.value.trim().length < 2 || name.value.trim().length > 80) {
-    error.value = 'Укажите название от 2 до 80 символов.'
-    nameInput.value?.focus()
+  const id = role.value === 'business' ? 'demo-business-1' : teamId.value
+  if (!id) {
+    error.value = 'Выберите студенческую команду.'
     return
   }
   busy.value = true
   try {
-    await store.createProfile(role.value, name.value)
+    await store.selectActor(id)
     await router.replace(next.value)
   } catch (err) {
-    error.value =
-      err instanceof Error ? err.message : 'Не удалось создать профиль. Попробуйте ещё раз.'
-  } finally {
-    busy.value = false
-  }
-}
-async function leave() {
-  if (busy.value) return
-  busy.value = true
-  try {
-    await store.leaveProfile()
-    await router.replace('/login')
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Не удалось выйти.'
-  } finally {
-    busy.value = false
-  }
-}
-async function resume() {
-  if (!role.value || busy.value) return
-  busy.value = true
-  try {
-    await store.resumeProfile(role.value)
-    await router.replace(next.value)
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Не удалось открыть профиль.'
+    error.value = err instanceof Error ? err.message : 'Не удалось переключить профиль.'
   } finally {
     busy.value = false
   }
 }
 </script>
+
 <template>
-  <section class="onboarding-page">
-    <RouterLink to="/catalog" class="back-link"
-      ><AppIcon name="ArrowLeft" :size="16" />Вернуться в каталог</RouterLink
-    >
-    <template v-if="store.profile">
-      <span class="eyebrow">МОЙ ПРОФИЛЬ</span>
-      <h1>{{ store.profile.name }}</h1>
-      <div class="panel profile-summary">
-        <span class="soft-icon blue"
-          ><AppIcon :name="store.isBusiness ? 'Building2' : 'Users'"
-        /></span>
-        <div>
-          <h2>{{ store.isBusiness ? 'Заказчик' : 'Исполнитель' }}</h2>
-          <p>
-            {{
-              store.isBusiness
-                ? 'Ваши задачи, предложения команд и результаты — в личном разделе.'
-                : 'Ваши предложения и результаты работы — в разделе откликов.'
-            }}
-          </p>
-        </div>
-      </div>
-      <p v-if="route.query.role && route.query.role !== store.profile.role" class="inline-alert">
-        Для этого действия нужен профиль
-        {{ route.query.role === 'business' ? 'заказчика' : 'исполнителя' }}. Сейчас вы работаете как
-        {{ store.isBusiness ? 'заказчик' : 'исполнитель' }}.
-      </p>
-      <RouterLink :to="store.isBusiness ? '/business' : '/applications'" class="button primary"
-        >{{ store.isBusiness ? 'Мои задачи' : 'Мои отклики' }}
-        <AppIcon name="ArrowRight" :size="17"
-      /></RouterLink>
-      <div v-if="store.account" class="panel profile-form">
-        <h2>Аккаунт и безопасность</h2>
-        <p>{{ store.account.email }}</p>
-        <p>
-          Вход подтверждён сервером. Пароль и токен сессии не сохраняются в хранилище браузера
-          приложением.
-        </p>
-        <p v-if="error" class="profile-error" role="alert">{{ error }}</p>
-        <button class="button secondary" :disabled="busy" @click="leave">
-          {{ busy ? 'Выходим…' : 'Выйти из аккаунта' }}
-        </button>
-      </div>
-      <details v-else class="local-profile-note">
-        <summary>О локальном профиле</summary>
-        <p>
-          Этот профиль доступен только в текущем браузере. Настоящий вход пока не подключён. При
-          выходе задачи сохранятся: можно вернуться через «Начать работу», выбрав ту же роль.
-        </p>
-        <button class="button secondary" :disabled="busy" @click="leave">
-          Выйти из локального профиля
-        </button>
-      </details>
-    </template>
-    <template v-else>
-      <span class="eyebrow">ПЕРВЫЙ ШАГ</span>
-      <h1>Что вы хотите сделать?</h1>
-      <p class="guide-intro">
-        Выберите свою сторону проекта. Профиль понадобится для задач и откликов — каталог открыт
-        всем.
-      </p>
-      <div class="role-options" role="group" aria-label="Ваша роль">
-        <button
-          type="button"
-          :class="{ selected: role === 'business' }"
-          :aria-pressed="role === 'business'"
-          @click="chooseRole('business')"
-        >
-          <AppIcon name="Building2" :size="26" /><b>Я заказчик</b
-          ><span>Разместить задачу и найти команду</span
-          ><AppIcon v-if="role === 'business'" name="CheckCircle2" class="role-check" />
-        </button>
-        <button
-          type="button"
-          :class="{ selected: role === 'team' }"
-          :aria-pressed="role === 'team'"
-          @click="chooseRole('team')"
-        >
-          <AppIcon name="Users" :size="26" /><b>Я исполнитель</b
-          ><span>Найти проект и предложить решение</span
-          ><AppIcon v-if="role === 'team'" name="CheckCircle2" class="role-check" />
-        </button>
-      </div>
-      <div v-if="saved" class="panel profile-form">
-        <h2>Продолжить как {{ saved.name }}?</h2>
-        <p>В этом браузере уже есть ваш локальный профиль. Задачи и отклики сохранены.</p>
-        <p v-if="error" class="profile-error" role="alert">{{ error }}</p>
-        <button class="button primary" :disabled="busy" @click="resume">
-          Продолжить работу <AppIcon name="ArrowRight" :size="17" />
-        </button>
-      </div>
-      <form
-        v-else-if="role && store.mode === 'demo'"
-        class="panel profile-form"
-        novalidate
-        @submit.prevent="submit"
+  <section class="onboarding-page role-page">
+    <RouterLink to="/catalog" class="back-link">
+      <AppIcon name="ArrowLeft" :size="16" />Вернуться в каталог
+    </RouterLink>
+    <span class="eyebrow">ДЕМОНСТРАЦИОННЫЙ РЕЖИМ</span>
+    <h1>Кем вы хотите продолжить?</h1>
+    <p class="guide-intro">
+      Для пятичасового MVP регистрация не нужна. Выберите сторону проекта и покажите полный путь от
+      задачи до результата.
+    </p>
+
+    <div class="role-options" role="group" aria-label="Роль на платформе">
+      <button
+        type="button"
+        :class="{ selected: role === 'business' }"
+        :aria-pressed="role === 'business'"
+        @click="role = 'business'"
       >
-        <h2>
-          {{
-            role === 'business' ? 'Как представить вас командам?' : 'Как называется ваша команда?'
-          }}
-        </h2>
-        <p>
-          Название будет видно
-          {{ role === 'business' ? 'рядом с вашими задачами' : 'в ваших откликах' }}.
-        </p>
-        <label for="profile-name" class="field-label">{{
-          role === 'business' ? 'Имя или название организации' : 'Название команды'
-        }}</label>
-        <input
-          id="profile-name"
-          ref="nameInput"
-          v-model="name"
-          class="profile-name"
-          maxlength="80"
-          :disabled="busy"
-          :aria-invalid="!!error"
-          :aria-describedby="error ? 'profile-error' : 'profile-note'"
-          :placeholder="role === 'business' ? 'Например, магазин Arman' : 'Например, Digital Team'"
-        />
-        <p v-if="error" id="profile-error" class="profile-error" role="alert">{{ error }}</p>
-        <p id="profile-note" class="local-profile-note">
-          Пробная версия: создаём локальный профиль в этом браузере. Email и пароль пока не нужны.
-        </p>
-        <button class="button primary" :disabled="busy" :aria-busy="busy">
-          <AppIcon
-            :name="busy ? 'LoaderCircle' : 'ArrowRight'"
-            :class="{ spin: busy }"
-            :size="17"
-          />{{ busy ? 'Создаём профиль…' : 'Создать профиль и продолжить' }}
-        </button>
-      </form>
-      <div v-else-if="role" class="panel profile-form">
-        <h2>Регистрация скоро появится</h2>
-        <p>Сервис входа ещё не подключён. Пока вы можете смотреть задачи в открытом каталоге.</p>
-        <RouterLink to="/catalog" class="button primary">Смотреть задачи</RouterLink>
+        <AppIcon name="Building2" :size="27" />
+        <b>Бизнес</b>
+        <span>Создать задачу, уточнить её с AI и выбрать команду.</span>
+        <AppIcon v-if="role === 'business'" name="CheckCircle2" class="role-check" />
+      </button>
+      <button
+        type="button"
+        :class="{ selected: role === 'team' }"
+        :aria-pressed="role === 'team'"
+        @click="role = 'team'"
+      >
+        <AppIcon name="GraduationCap" :size="27" />
+        <b>Студенческая команда</b>
+        <span>Выбрать задачу, отправить предложение и показать результат.</span>
+        <AppIcon v-if="role === 'team'" name="CheckCircle2" class="role-check" />
+      </button>
+    </div>
+
+    <div v-if="role === 'team'" class="panel preset-teams">
+      <div>
+        <h2>Выберите готовую команду</h2>
+        <p>У каждой команды уже есть профиль, навыки и история предложений.</p>
       </div>
-    </template>
+      <label v-for="team in store.teams" :key="team.id" class="preset-team">
+        <input v-model="teamId" type="radio" name="team" :value="team.id" />
+        <span class="actor-avatar"><AppIcon name="Users" :size="18" /></span>
+        <span
+          ><b>{{ team.name }}</b
+          ><small>{{ team.technologies.join(' · ') }}</small></span
+        >
+        <strong>{{ team.points }} баллов</strong>
+      </label>
+      <p v-if="store.loading" class="muted">Загружаем профили команд…</p>
+      <p v-else-if="!store.teams.length" class="profile-error" role="alert">
+        Профили команд пока недоступны. Обновите страницу или выберите роль бизнеса.
+      </p>
+    </div>
+
+    <p v-if="store.profile" class="current-demo-role">
+      Сейчас выбрано: <b>{{ store.profile.name }}</b>
+    </p>
+    <p v-if="error" class="profile-error" role="alert">{{ error }}</p>
+    <div class="auth-actions">
+      <button
+        class="button primary"
+        :disabled="busy || (role === 'team' && !teamId)"
+        @click="applyProfile"
+      >
+        <AppIcon :name="busy ? 'LoaderCircle' : 'ArrowRight'" :class="{ spin: busy }" :size="17" />
+        {{ busy ? 'Переключаем…' : `Продолжить как ${role === 'business' ? 'бизнес' : 'команда'}` }}
+      </button>
+      <RouterLink to="/catalog" class="button ghost">Смотреть каталог без роли</RouterLink>
+    </div>
+    <p class="local-profile-note">
+      Это демонстрационные профили хакатона. Email, номер телефона и пароль не требуются.
+    </p>
   </section>
 </template>

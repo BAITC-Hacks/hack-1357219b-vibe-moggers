@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { request } from '../services/session'
+import { aiRequest } from '../services/ai-api'
+import { useWorkspace } from '../stores/workspace'
 import AppIcon from './AppIcon.vue'
 const route = useRoute()
+const store = useWorkspace()
 const dialog = ref<HTMLDialogElement>(),
   input = ref<HTMLTextAreaElement>(),
   log = ref<HTMLElement>()
@@ -32,9 +34,9 @@ async function send() {
   busy.value = true
   controller = new AbortController()
   try {
-    const result = await request<{ reply: string }>(
+    const result = await aiRequest<{ reply: string }>(
+      store.actorId,
       '/ai/chat',
-      'POST',
       {
         messages: [...messages.value.slice(-18), { role: 'user', content: question }],
         context: {

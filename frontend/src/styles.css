@@ -16,6 +16,9 @@
   --scroll-track: #f0f2f7;
   --scroll-hover: #7b89a4;
   --scroll-active: #536685;
+  --z-sticky: 100;
+  --z-dialog: 600;
+  --z-toast: 900;
 }
 * {
   box-sizing: border-box;
@@ -190,7 +193,7 @@ select {
   top: -100px;
   background: white;
   padding: 14px;
-  z-index: 100;
+  z-index: var(--z-toast);
 }
 .skip-link:focus {
   top: 10px;
@@ -248,7 +251,7 @@ select {
   display: flex;
   flex-direction: column;
   padding: 32px 20px 20px;
-  z-index: 20;
+  z-index: var(--z-sticky);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -2577,7 +2580,7 @@ select {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 100;
+  z-index: var(--z-toast);
 }
 .toast {
   display: flex;
@@ -4031,24 +4034,88 @@ summary:hover {
   }
 }
 
-/* Account entry and contextual assistant share the product's existing palette. */
+/* Demo role entry and contextual assistant share the product's existing palette. */
 .auth-actions {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   margin: 24px 0;
 }
-.auth-page {
-  max-width: 760px;
+.role-switcher {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 210px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
 }
-.auth-page .profile-form {
+.role-switcher-copy {
   display: grid;
-  gap: 16px;
+  min-width: 0;
+  flex: 1;
 }
-.auth-page input,
-.auth-page select {
+.role-switcher-copy small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.role-switcher select {
   width: 100%;
-  min-height: 48px;
+  max-width: 210px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.preset-teams {
+  display: grid;
+  gap: 10px;
+  padding: 24px;
+  margin: 22px 0;
+}
+.preset-teams h2 {
+  color: var(--ink);
+  font-size: 17px;
+  padding: 0;
+}
+.preset-teams > div > p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 5px;
+}
+.preset-team {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  cursor: pointer;
+}
+.preset-team:has(input:checked) {
+  border-color: var(--blue);
+  background: #f4f6ff;
+}
+.preset-team b,
+.preset-team small {
+  display: block;
+}
+.preset-team small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.preset-team strong {
+  color: var(--blue);
+  font-size: 12px;
+}
+.current-demo-role {
+  color: #596579;
+  font-size: 13px;
 }
 .assistant-emblem {
   margin: 28px 0 8px;
@@ -4098,6 +4165,7 @@ summary:hover {
   background: white;
   color: #202c43;
   box-shadow: 0 24px 80px #17284533;
+  z-index: var(--z-dialog);
 }
 .assistant-dialog[open] {
   animation: assistant-enter 0.28s ease-out;
@@ -4207,7 +4275,7 @@ summary:hover {
 @media (max-width: 760px) {
   .assistant-emblem {
     position: fixed;
-    z-index: 25;
+    z-index: var(--z-sticky);
     bottom: 20px;
     right: 18px;
     padding: 7px;
@@ -4242,4 +4310,123 @@ summary:hover {
 .assistant-composer textarea:focus {
   outline: 3px solid #3559e333;
   border-color: var(--blue);
+}
+.voice-interview-callout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+  margin-top: 14px;
+  border: 1px solid #dce4ff;
+  border-radius: 15px;
+  background: linear-gradient(110deg, #f7f8ff, #eef3ff);
+}
+.voice-interview-callout b {
+  font-size: 14px;
+}
+.voice-interview-callout p {
+  color: #66758e;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 3px;
+}
+.voice-recorder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.voice-interview-callout .voice-recorder {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+.voice-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 7px 13px 7px 8px;
+  border: 1px solid #cdd8ff;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 750;
+}
+.voice-button:hover {
+  border-color: var(--blue);
+  background: #f5f7ff;
+}
+.voice-button > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #edf1ff;
+}
+.voice-button.recording {
+  border-color: #e08c91;
+  color: #a52b32;
+  background: #fff7f7;
+}
+.voice-button.recording > span {
+  color: white;
+  background: #c84149;
+  animation: voice-pulse 1.4s ease-in-out infinite;
+}
+.voice-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+}
+.voice-status,
+.voice-success,
+.voice-error {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.voice-status {
+  color: #9b3137;
+}
+.voice-success {
+  color: #27765f;
+}
+.voice-error {
+  color: #a52b32;
+}
+@keyframes voice-pulse {
+  50% {
+    box-shadow: 0 0 0 7px #c8414920;
+  }
+}
+@media (max-width: 760px) {
+  .role-switcher {
+    min-width: 0;
+  }
+  .role-switcher-copy small {
+    display: none;
+  }
+  .role-switcher select {
+    max-width: 145px;
+  }
+  .voice-interview-callout {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .voice-interview-callout .voice-recorder {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .preset-team {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+  .preset-team strong {
+    grid-column: 3;
+  }
 }

@@ -1,0 +1,15 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["frontend/src"],
+  "locale": "ru-RU",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {
+    "Select/Listbox": "native"
+  },
+  "commands": [
+    "npm --prefix frontend test",
+    "npm --prefix frontend run build",
+    "npm --prefix frontend run format:check"
+  ]
+}

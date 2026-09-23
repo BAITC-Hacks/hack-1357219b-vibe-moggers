@@ -43,6 +43,8 @@ import {
   Globe,
   ListChecks,
   Save,
+  Mic,
+  Square,
 } from '@lucide/vue'
 const icons = {
   ArrowUpRight,
@@ -88,6 +90,8 @@ const icons = {
   Globe,
   ListChecks,
   Save,
+  Mic,
+  Square,
 }
 defineProps<{ name: keyof typeof icons; size?: number }>()
 </script>

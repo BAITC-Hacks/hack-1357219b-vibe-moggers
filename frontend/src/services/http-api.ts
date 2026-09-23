@@ -12,14 +12,13 @@ import type {
   Team,
 } from '../domain/types'
 import { ApiError } from './errors'
-import { csrfToken, account } from './session'
 import { validateSuggestions } from './demo-api'
 import { fieldKeys } from '../domain/scoring'
 
 export class HttpApi implements Gateway {
   readonly mode = 'api' as const
   constructor(
-    _actor: () => string,
+    private _actor: () => string,
     private base = import.meta.env.VITE_API_BASE_URL || '/api',
   ) {}
   private async request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -28,17 +27,15 @@ export class HttpApi implements Gateway {
     try {
       const response = await fetch(`${this.base.replace(/\/$/, '')}${path}`, {
         method,
-        credentials: 'include',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          ...(method === 'GET' ? {} : { 'X-CSRF-Token': csrfToken() }),
+          'X-Demo-Actor': this._actor(),
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
       const payload = await response.json().catch(() => null)
-      if (response.status === 401) account.value = null
       if (!response.ok)
         throw new ApiError(
           payload?.error?.message || `Сервер вернул ошибку ${response.status}`,
