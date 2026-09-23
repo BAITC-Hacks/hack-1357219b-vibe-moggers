@@ -1,5 +1,4 @@
-// Package tasks exposes the small SQL boundary needed by the offers module.
-// Task creation, cards and publication belong to block 1.
+// Package tasks implements the task builder and the SQL boundary for proposals.
 package tasks
 
 import (
@@ -9,12 +8,6 @@ import (
 
 	"vibe-moggers/backend/internal/httpapi"
 )
-
-type Task struct {
-	ID        string
-	OwnerID   string
-	Published bool
-}
 
 type Access interface {
 	Lock(context.Context, *sql.Tx, string) (Task, error)

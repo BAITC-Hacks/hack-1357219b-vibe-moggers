@@ -1,90 +1,117 @@
-# Backend
+# Qadam Backend
 
-Go API backed by PostgreSQL.
+Go 1.23+, `net/http`, `database/sql`, PostgreSQL, OpenAI Responses API. No ORM.
+The backend implements the task builder, confirmed readiness scores, catalog,
+proposals, manual decisions and one verified milestone per accepted proposal.
+Frontend implementation/integration is separate.
 
-## Frontend API contract
+## Start locally
 
-See [the page-by-page request list](docs/api-request-list.md) for the five MVP
-screens, request/response shapes, rating rules and demo flow. Open
-[the Postman v3 collection](docs/postman/README.md) in Postman's Local View to
-exercise the agreed routes as they are implemented.
+Run these commands from `backend` with Docker Desktop running:
 
-Implemented: health (`/health` and `/api/health`), team creation/list/profile,
-offers, owner decisions, and one-time +10 acceptance awards. Existing `/proposals`
-routes are supported as aliases. Task creation, AI, cards and catalog (block 1)
-are still pending in this checkout.
+```powershell
+docker compose up -d postgres pgadmin
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+go run ./cmd/seed
+go run ./cmd/api
+```
 
-See [block 2 integration and request examples](docs/block2.md) for the exact
-routes, demo identity headers, task schema boundary, and local test fixture.
+The API listens on `http://127.0.0.1:8080`. Existing environment variables override
+`.env`; commands automatically load `.env` from the current working directory.
+Set a different `PORT` if 8080 is already occupied. Startup applies ordered,
+transactional embedded migrations. Existing migration files are not rewritten.
 
-## Local setup
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/api/health
+```
 
-Requirements: Go 1.23+ and Docker Desktop.
+Expected in fallback mode:
 
-1. Start PostgreSQL and pgAdmin:
+```json
+{"data":{"status":"ok","database":"connected","aiMode":"fallback"}}
+```
 
-   ```powershell
-   docker compose up -d
-   ```
+PostgreSQL: host `localhost`, port `5433`, database `gamified_tasks`, username
+`hackathon`, password `hackathon`. These are local demo credentials only.
+pgAdmin: `http://localhost:5050`, login `admin@example.com` / `admin`.
+Register its database connection using host **postgres**, port **5432**, and the
+same database/user/password. The API connects through host port 5433 instead.
 
-2. Set the local environment variables in PowerShell:
+## OpenAI secret and model
 
-   ```powershell
-   $env:PORT = "8080"
-   $env:DATABASE_URL = "postgres://hackathon:hackathon@localhost:5433/gamified_tasks?sslmode=disable"
-   ```
+Do not paste your API key into chat, Postman, frontend code, commands or commits.
+Use the masked local prompt:
 
-3. Start the API:
+```powershell
+.\scripts\set-openai.ps1 -Model gpt-4.1-mini
+go run ./cmd/check-ai
+```
 
-   ```powershell
-   go run ./cmd/api
-   ```
+The script preserves other `.env` entries and sets `OPENAI_API_KEY`, `OPENAI_MODEL`
+and `AI_MODE=live`. `.env` is Git-ignored but remains plaintext on your machine:
+do not share the file. Model access depends on the hackathon project's key.
+Use the exact model ID granted by the organizers if different.
+`check-ai` makes one small billable analysis request, with at most one transient
+retry, and prints only model, mode, question count and duration. It exits nonzero
+if the request falls back. Restart the API after changing its configuration.
 
-   Startup applies embedded SQL migrations once and seeds five demo teams.
-   It does not create published demo tasks; use the SQL fixture in `docs/block2.md`
-   until block 1 can create and publish them.
+The adapter uses [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+with `store=false`, bounded responses, source validation and a 15-second total
+timeout. [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+supports the required structured-output workflow; this does not guarantee access
+for your specific key. Set `AI_MODE=fallback` to work without API calls.
+Fallback returns prepared questions, no invented field values, and `mode=fallback`.
+The prompt is in `internal/ai/prompt.txt`; malformed-output examples and parser
+checks are in `internal/ai/ai_test.go`.
 
-4. Verify the API and database connection:
+## Frontend contract and demo
 
-   ```powershell
-   Invoke-RestMethod http://localhost:8080/health
-   ```
+- [Page-by-page routes and payloads](docs/api-request-list.md)
+- [Postman v3 folder collection](docs/postman/README.md)
+- [Teammate integration notes](docs/block2.md)
+- [Product specification](../docs/SPEC.md)
 
-   Expected response:
+Select a demo actor using `X-Demo-Actor: business:UUID` or `team:UUID`.
+Seed business: `10000000-0000-4000-8000-000000000001`.
+Seed teams: `00000000-0000-4000-8000-000000000001` through `...000005`.
+`GET /api/teams` returns the IDs and profiles. IDs in the original JSON fixtures
+map deterministically to UUIDs; seed tasks start `20000000`, drafts `30000000`,
+proposals `40000000`. Existing seed records and subsequent edits are preserved.
+The five team profiles from the original migration are also preserved.
 
-   ```json
-   {"database":"connected","status":"ok"}
-   ```
-
-pgAdmin is available at `http://localhost:5050`. Log in with
-`admin@hackathon.local` / `admin`, then register a server using host `postgres`,
-port `5432`, database `gamified_tasks`, and username/password
-`hackathon` / `hackathon`.
-
-The container maps PostgreSQL to host port `5433` to avoid conflicts with a
-locally installed PostgreSQL server. Connections from pgAdmin use the internal
-Docker port `5432`.
-
-Configuration values are documented in `.env.example`. The application reads
-environment variables directly and does not automatically load a `.env` file.
+Demo: create a draft, request questions, save answers/card, confirm four 10-point
+fields, publish at 40, submit/accept a proposal, submit/confirm its milestone for
+10 points, then fill and confirm all fields except feedbackFormat to reach 95.
+The Postman folders follow that flow. Rejection uses a separate proposal.
 
 ## Verification
 
 ```powershell
 go test ./...
+$env:TEST_DATABASE_URL = 'postgres://hackathon:hackathon@localhost:5433/gamified_tasks?sslmode=disable'
+go test ./... -count=1 -v -timeout=60s
 go vet ./...
-go build ./cmd/api
+go build ./...
 ```
 
-The PostgreSQL integration suite is enabled explicitly:
+Integration tests create and drop only randomly named test schemas. They never
+reset application data. Without `TEST_DATABASE_URL`, they explicitly skip.
+The DB user needs CREATE SCHEMA permission. Tests cover the 40-to-95 flow, seed
+idempotence, filters, revision conflicts, private/public snapshots, multiple
+accepted teams, milestone authorization, concurrent one-time awards, transaction
+rollback, DB reopening, source checks, invalid AI output, retries and timeout.
+Provider tests use a local HTTP fake; a real key is checked separately by `check-ai`.
 
-```powershell
-$env:TEST_DATABASE_URL = "postgres://hackathon:hackathon@localhost:5433/gamified_tasks?sslmode=disable"
-go test -count=1 -v ./...
-```
+Recorded results and limitations: [verification report](docs/verification.md).
 
-It creates and drops a uniquely named test schema, not the application's tables.
-The database user needs permission to create schemas. Without `TEST_DATABASE_URL`,
-integration tests are reported as skipped. The suite checks two accepted teams,
-all rejected, ownership, unpublished tasks, concurrent retries, persistence across
-connections, migration idempotence, and rollback after a late transaction error.
+## Deliberate limits
+
+- Demo actors are not authentication. The API binds to loopback; do not expose it
+  publicly. `DEMO_MODE=false` disables application routes until real auth exists.
+- In development, proxy `/api` from Vite to `http://127.0.0.1:8080`; no wildcard CORS.
+- No XP/streak dashboard, paid ranking, recommendations or automatic team selection.
+- Existing `/offers` and accept/reject aliases remain for compatibility. New clients
+  should use the documented `/proposals` routes and `{data:...}` envelopes.
+- Historical acceptance awards remain stored but do not contribute to progress
+  points. Only `progress_awards` from confirmed milestones count.
+- The seed command is additive and idempotent. There is no destructive public reset.

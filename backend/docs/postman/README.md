@@ -1,49 +1,38 @@
-# Hackathon API collection
+# Postman Collection
 
-This is a Postman v3 collection containing 18 ready-to-send request definitions
-for the agreed backend contract, including both public and editor task reads.
+This repository keeps the existing Postman v3 folder/YAML format. Open
+`backend/docs` in Postman's Local View; `.postman/resources.yaml` registers
+`postman/collections/Hackathon API`. These are not JSON import files.
 
-## Open in Postman 12
+Start PostgreSQL, run `go run ./cmd/seed`, and start `go run ./cmd/api` from backend.
+The `base_url` collection variable defaults to `http://127.0.0.1:8080`.
+No OpenAI key belongs in Postman; it is read only by the Go process.
 
-In your existing workspace, use Local View and look for **Hackathon API**.
-The collection is registered in `backend/docs/.postman/resources.yaml`.
+Run folders in order:
 
-If you need to reopen the folder, use **Files > Open folder** and select
-`backend/docs`. Open `postman/collections/Hackathon API` in the file tree.
-Postman v3 uses a folder of YAML files, not a single JSON import.
+1. Health.
+2. Business tasks and team profiles; capture the demo team UUIDs.
+3. Builder: create, ask, save, assemble, edit, confirm and publish a 40-point card.
+4. Catalog/details and a team proposal.
+5. Review: accept the first proposal, create and reject a separate second proposal.
+6. Progress: submit a result, confirm it and inspect the team's 10 points.
+7. Improve the card to 95, reconfirm and inspect its catalog position.
 
-Base URL: `http://localhost:8080`. Change the collection's `base_url` variable
-if your Go server uses another port.
+Response scripts save task/proposal/milestone IDs and revisions automatically.
+Requests use deterministic manual card fields so both fallback and live AI runs
+can complete. In a real UI, map and review returned AI suggestions before saving.
+Final proposal decisions cannot be reversed. Repeated milestone confirmation
+does not award additional points. Repeating the entire collection creates another
+task and another milestone award; compare the per-milestone points, not a global
+team total of exactly 10 after multiple runs.
 
-## Send requests
+See [the page-by-page contract](../api-request-list.md) for payloads and errors.
 
-- Start with **01 - Health > Health**. PostgreSQL and the Go API must be running.
-- After the planned endpoints are implemented, run folders **02** through **04**
-  in order. Create draft captures `task_id`; questions capture question IDs;
-  saving changes updates `revision`; List teams captures `team_id`;
-  Submit proposal captures `proposal_id`.
-- Use **05 - Proposal review > Accept proposal** or **Reject proposal** for the
-  same proposal. Running both leaves it rejected.
-- The card and answers use synthetic demo data. Adjust answers to match the
-  questions actually returned by AI.
-- Browse catalog already includes rating sorting. To filter, add
-  `topic=retail` and `readiness=priority` to its query parameters.
+## Optional collection smoke test
 
-Health, teams and proposal submission/review are implemented. Task builder/AI
-and catalog remain pending. For block 2 alone, use the SQL task fixture in
-[block2.md](../block2.md), set `task_id`, and set `business_id` to its owner UUID
-(`10000000-0000-4000-8000-000000000001` for that fixture). List teams captures
-`team_id`. Requests supply `X-Demo-Actor` for the selected team/business.
-Health returns 503 if its database connection becomes unavailable.
-
-First acceptance adds 10 points once per proposal. Repeating acceptance or
-rejecting and accepting the same proposal again never awards a second time.
-Rejecting an accepted proposal retains the original award. Check the total
-with `GET /api/teams/{{team_id}}`. The canonical `/offers` routes and examples
-are documented in `block2.md`; these `/proposals` aliases use the same data.
-
-For additional validation, reuse the requests with a title-only card to check
-low-readiness publication, or submit proposals from different teams and accept
-each in turn to check that multiple teams can be selected.
-
-The shared API contract is [api-request-list.md](../api-request-list.md).
+With Node.js and Python + PyYAML installed, `node scripts/check-postman.cjs` from
+backend sends these YAML requests to the running local API and executes the
+assertion subset used in their response scripts. It does not automate Postman.
+This creates a demonstration task/proposals/milestone, so run it only locally.
+Set `BASE_URL` to use a different local port; remote hosts are rejected.
+The app itself does not depend on Node or Python.

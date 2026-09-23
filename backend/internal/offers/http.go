@@ -20,13 +20,16 @@ func NewHandler(store *Store, logger *slog.Logger) *Handler {
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/proposals/{offer_id}/milestone", h.submitMilestone)
+	mux.HandleFunc("POST /api/milestones/{milestone_id}/confirm", h.confirmMilestone)
 	mux.HandleFunc("POST /api/tasks/{task_id}/offers", h.create(false))
 	mux.HandleFunc("GET /api/tasks/{task_id}/offers", h.list(false))
 	mux.HandleFunc("PATCH /api/offers/{offer_id}/status", h.decide("", false))
 	// Compatibility with the existing frontend/Postman contract. Both route
 	// families use the same rows and transactional decision implementation.
-	mux.HandleFunc("POST /api/tasks/{task_id}/proposals", h.create(true))
-	mux.HandleFunc("GET /api/tasks/{task_id}/proposals", h.list(true))
+	mux.HandleFunc("POST /api/tasks/{task_id}/proposals", h.createProposal)
+	mux.HandleFunc("GET /api/tasks/{task_id}/proposals", h.listProposals)
+	mux.HandleFunc("POST /api/proposals/{offer_id}/decision", h.decision)
 	mux.HandleFunc("POST /api/proposals/{offer_id}/accept", h.decide("accepted", true))
 	mux.HandleFunc("POST /api/proposals/{offer_id}/reject", h.decide("rejected", true))
 }

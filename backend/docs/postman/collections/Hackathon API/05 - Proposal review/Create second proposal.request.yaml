@@ -1,0 +1,33 @@
+$kind: http-request
+description: "Implemented. See backend/docs/api-request-list.md."
+url: "{{base_url}}/api/tasks/{{task_id}}/proposals"
+method: POST
+headers:
+  Accept: "application/json"
+  Content-Type: "application/json"
+  X-Demo-Actor: "team:{{second_team_id}}"
+body:
+  type: json
+  content: |-
+    {
+      "idea": "Build a CSV-based purchasing prototype.",
+      "plan": [
+        "Inspect data",
+        "Build prototype",
+        "Run acceptance checks"
+      ],
+      "durationDays": 7,
+      "prototypeUrl": "https://example.org/demo"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('HTTP 201',()=>pm.response.to.have.status(201));
+      pm.test('JSON response',()=>pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      if (pm.response.code === 201) {
+        const d = pm.response.json().data;
+        pm.test('Data envelope',()=>pm.expect(d).not.to.eql(undefined));
+        pm.collectionVariables.set('rejected_proposal_id',d.id);
+      }
+order: 17000
