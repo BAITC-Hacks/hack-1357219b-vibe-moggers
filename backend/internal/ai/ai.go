@@ -262,7 +262,7 @@ func parse(text string, in Input) (Result, error) {
 		value := rating.Normalize(f.Value)
 		source, ok := sources[f.SourceID]
 		if !rating.Known(f.Field) || seen[f.Field] || !ok || value == "" || utf8.RuneCountInString(value) > 10000 || !strings.Contains(source, value) {
-			out.Warnings = append(out.Warnings, "Ignored an invalid or unsupported field suggestion.")
+			out.Warnings = append(out.Warnings, "Часть предложений AI пропущена: их не удалось подтвердить вашим описанием. Эти поля можно заполнить вручную.")
 			continue
 		}
 		f.Value = value
