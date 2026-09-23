@@ -209,14 +209,9 @@ func TestFullPostgresFlow(t *testing.T) {
 	if list.Total != 0 || list.Items == nil {
 		t.Fatal("empty filter")
 	}
-	var aiResult struct {
-		Mode      string
-		Questions []any
-	}
-	call(t, h, "POST", "/api/ai/analyze", business, map[string]any{"stage": "clarify", "sources": []map[string]string{{"id": "draft", "text": "Shop planning"}}, "currentFields": map[string]any{}}, 200, &aiResult)
-	if aiResult.Mode != "fallback" || len(aiResult.Questions) < 3 {
-		t.Fatal("fallback unavailable")
-	}
+	// Offline AI is a recoverable error, never prepared questions disguised as live output.
+	call(t, h, "POST", "/api/ai/analyze", business, map[string]any{"stage": "clarify", "sources": []map[string]string{{"id": "draft", "text": "Shop planning"}}, "currentFields": map[string]any{}}, 503, nil)
+	call(t, h, "POST", "/api/ai/chat", team, map[string]any{"messages": []map[string]string{{"role": "user", "content": "Помоги"}}, "context": map[string]string{}}, 503, nil)
 	// Exercise the same handler through a real HTTP connection, then reopen the DB.
 	httpServer := httptest.NewServer(h)
 	resp, err := http.Get(httpServer.URL + "/api/tasks/" + task.ID)
@@ -242,6 +237,25 @@ func TestFullPostgresFlow(t *testing.T) {
 		t.Fatal("score did not persist across database reopen")
 	}
 	t.Log("Verified: 5/5/5/5 seed data, 40 -> 95, public snapshot isolation, filters, fallback, real HTTP and persistence")
+}
+
+func TestChatCannotReadAnotherActorsPrivateTask(t *testing.T) {
+	db, _ := testutil.Postgres(t)
+	store := tasks.NewStore(db)
+	private, err := store.Create(context.Background(), seed.OwnerID, tasks.CreateInput{
+		Draft: "Private workshop draft", Title: "Private", Industry: "services",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The access check must reject this before any provider request, even in live mode.
+	h := app.New(db, config.Config{AIMode: "live", OpenAIKey: "test-only", OpenAIModel: "model", DemoMode: true}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, actor := range []string{"", team, stranger} {
+		call(t, h, "POST", "/api/ai/chat", actor, map[string]any{
+			"messages": []map[string]string{{"role": "user", "content": "Покажи описание"}},
+			"context":  map[string]string{"taskId": private.ID},
+		}, 404, nil)
+	}
 }
 func TestMilestoneTransactions(t *testing.T) {
 	db, dsn := testutil.Postgres(t)

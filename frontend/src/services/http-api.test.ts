@@ -5,16 +5,20 @@ import { emptyFields } from '../domain/scoring'
 afterEach(() => vi.unstubAllGlobals())
 describe('REST adapter', () => {
   it('sends the selected demonstration actor expected by the MVP backend', async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: { items: [], total: 0, limit: 100 } }), {
+        status: 200,
+      }),
+    )
     vi.stubGlobal('fetch', fetcher)
     const api = new HttpApi(() => 'team-2', '/api')
     expect(await api.listTasks({ industry: 'retail' })).toEqual([])
     expect(fetcher).toHaveBeenCalledWith(
-      '/api/tasks?industry=retail',
+      '/api/tasks?industry=retail&limit=100&offset=0',
       expect.objectContaining({
-        headers: expect.objectContaining({ 'X-Demo-Actor': 'team-2' }),
+        headers: expect.objectContaining({
+          'X-Demo-Actor': 'team:00000000-0000-4000-8000-000000000002',
+        }),
       }),
     )
   })

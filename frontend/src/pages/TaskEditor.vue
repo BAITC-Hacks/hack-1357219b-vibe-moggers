@@ -340,6 +340,7 @@ onBeforeRouteLeave(() => !dirty.value || canLeave.value || (leaveDialog.value?.a
           </div>
           <VoiceRecorder
             v-model="form.draft"
+            :disabled="busy || !!task"
             label="Записать описание"
             :max-length="6000"
             :context="`Описание бизнес-задачи «${form.title || 'без названия'}». Распознай речь на русском или казахском языке.`"
@@ -399,6 +400,7 @@ onBeforeRouteLeave(() => !dirty.value || canLeave.value || (leaveDialog.value?.a
           />
           <VoiceRecorder
             v-model="answers[question.id]"
+            :disabled="busy"
             label="Ответить голосом"
             :context="`${question.text} Контекст задачи: ${form.draft.slice(0, 700)}`"
           />

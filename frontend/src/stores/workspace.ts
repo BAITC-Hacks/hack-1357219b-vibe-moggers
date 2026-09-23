@@ -8,7 +8,7 @@ export const useWorkspace = defineStore('workspace', () => {
   const actorId = ref(readActor())
   const demoApi = new DemoApi(() => actorId.value, localStorage)
   const liveApi = new HttpApi(() => actorId.value)
-  const api = computed(() => (import.meta.env.VITE_DATA_MODE === 'api' ? liveApi : demoApi))
+  const api = computed(() => (import.meta.env.VITE_DATA_MODE === 'demo' ? demoApi : liveApi))
   const mode = computed(() => api.value.mode)
   const catalog = ref<Task[]>([])
   const mine = ref<Task[]>([])

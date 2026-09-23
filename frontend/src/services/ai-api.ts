@@ -1,4 +1,5 @@
 import { ApiError } from './errors'
+import { actorHeaders } from './api-contract'
 
 const base = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
@@ -32,7 +33,7 @@ export async function aiRequest<T>(
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-Demo-Actor': actorId,
+        ...actorHeaders(actorId),
       },
       body: JSON.stringify(body),
     })
@@ -71,7 +72,7 @@ export async function transcribeAudio(
     const response = await fetch(`${base}/ai/transcribe`, {
       method: 'POST',
       signal: controller.signal,
-      headers: { Accept: 'application/json', 'X-Demo-Actor': actorId },
+      headers: { Accept: 'application/json', ...actorHeaders(actorId) },
       body: form,
     })
     const result = await parseResponse<{ text: string; language?: string }>(response)

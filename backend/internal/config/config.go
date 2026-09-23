@@ -10,12 +10,13 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	AIMode      string
-	OpenAIKey   string
-	OpenAIModel string
-	DemoMode    bool
+	Port            string
+	DatabaseURL     string
+	AIMode          string
+	OpenAIKey       string
+	OpenAIModel     string
+	TranscribeModel string
+	DemoMode        bool
 }
 
 func Load() (Config, error) {
@@ -23,11 +24,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("could not parse .env")
 	}
 	cfg := Config{
-		Port:        valueOrDefault("PORT", "8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		AIMode:      valueOrDefault("AI_MODE", "fallback"),
-		OpenAIKey:   strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
-		OpenAIModel: valueOrDefault("OPENAI_MODEL", "gpt-4.1-mini"),
+		Port:            valueOrDefault("PORT", "8080"),
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		AIMode:          valueOrDefault("AI_MODE", "fallback"),
+		OpenAIKey:       strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
+		OpenAIModel:     valueOrDefault("OPENAI_MODEL", "gpt-4.1-mini"),
+		TranscribeModel: valueOrDefault("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe"),
 	}
 	port, err := strconv.Atoi(cfg.Port)
 	if err != nil || port < 1 || port > 65535 {

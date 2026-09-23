@@ -46,6 +46,7 @@ async function send() {
       },
       controller.signal,
     )
+    if (controller.signal.aborted) return
     if (
       !result ||
       typeof result.reply !== 'string' ||

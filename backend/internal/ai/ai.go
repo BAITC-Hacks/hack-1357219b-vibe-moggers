@@ -288,6 +288,10 @@ func (s *Service) Register(logger *slog.Logger) func(*http.ServeMux) {
 				httpapi.Fail(w, logger, err)
 				return
 			}
+			if out.Mode != "live" {
+				httpapi.Fail(w, logger, providerError())
+				return
+			}
 			httpapi.Data(w, 200, out)
 		})
 	}

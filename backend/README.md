@@ -3,7 +3,8 @@
 Go 1.23+, `net/http`, `database/sql`, PostgreSQL, OpenAI Responses API. No ORM.
 The backend implements the task builder, confirmed readiness scores, catalog,
 proposals, manual decisions and one verified milestone per accepted proposal.
-Frontend implementation/integration is separate.
+The Vue frontend is integrated through the Vite proxy. See the root README for
+macOS/Linux startup and `../frontend/AI-CONTRACT.md` for chat and voice payloads.
 
 ## Start locally
 
@@ -60,9 +61,17 @@ with `store=false`, bounded responses, source validation and a 15-second total
 timeout. [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
 supports the required structured-output workflow; this does not guarantee access
 for your specific key. Set `AI_MODE=fallback` to work without API calls.
-Fallback returns prepared questions, no invented field values, and `mode=fallback`.
+The internal offline analyzer can return `mode=fallback` for diagnostic tests;
+the HTTP endpoint returns 503 instead of exposing prepared questions as AI output.
 The prompt is in `internal/ai/prompt.txt`; malformed-output examples and parser
 checks are in `internal/ai/ai_test.go`.
+
+`POST /api/ai/chat` uses Responses API with server instructions and `store=false`.
+It loads only a public task snapshot or the selected business actor's own draft.
+`POST /api/ai/transcribe` accepts up to 15 MiB of WebM/MP4/Ogg/WAV audio,
+checks the container signature and calls Audio Transcriptions with
+`OPENAI_TRANSCRIBE_MODEL` (default `gpt-4o-mini-transcribe`). Audio is not retained.
+Provider failures return bounded errors without exposing provider response bodies.
 
 ## Frontend contract and demo
 

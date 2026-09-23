@@ -12,7 +12,8 @@ HTTP-реализация: [src/services/http-api.ts](src/services/http-api.ts).
 
 В верхней панели доступен переключатель «Бизнес / Студенческая команда» с готовыми
 профилями `demo-business-1` и `team-1`…`team-5`. Выбор сохраняется локально и
-передаётся в `X-Demo-Actor`. Каталог остаётся доступным с actor `guest`.
+преобразуется адаптером в `X-Demo-Actor: business:UUID` или `team:UUID`.
+Для гостя заголовок отсутствует, каталог открыт.
 Необязательный `Task.ownerName` используется для имени заказчика; если он отсутствует,
 для известного seed-владельца показано AI Sana, для остальных — «Заказчик».
 
@@ -20,7 +21,8 @@ HTTP-реализация: [src/services/http-api.ts](src/services/http-api.ts).
 
 - Префикс `/api`; JSON. Успех **всегда** `{ "data": ... }`.
 - Ошибка `{ "error": { "code": "...", "message": "Понятное описание", "fields": {} } }`.
-- `X-Demo-Actor: demo-business-1` либо `team-1` … `team-5`.
+- `X-Demo-Actor: business:10000000-0000-4000-8000-000000000001` либо
+  `team:00000000-0000-4000-8000-000000000001` … `...000005`.
   Frontend не отправляет доверенный ownerId/teamId в теле.
 - Demo actor — временная демонстрационная идентичность. Go сам проверяет владельца действий.
 - camelCase, строковые ID, время UTC ISO 8601, неизвестные значения `null`.
@@ -28,38 +30,41 @@ HTTP-реализация: [src/services/http-api.ts](src/services/http-api.ts).
 - Максимум запроса frontend — 20 секунд; AI timeout backend должен быть короче.
 - Публичный рейтинг — `confirmedSnapshot.total`; frontend не заменяет его прогнозом.
 
-## Два дополнения, которые нужно учесть
+## Адаптация формата Go
 
-1. **`GET /tasks?scope=owned`** — приватные и опубликованные задачи выбранного бизнеса.
+1. **`GET /business/tasks`** — приватные и опубликованные задачи выбранного бизнеса.
    Без этого запроса после перезагрузки нельзя восстановить список его частных черновиков.
    Основной `GET /tasks` остаётся общим каталогом только опубликованных задач.
 2. **`Proposal.milestone`** — вложенный этап или `null`. Создание/подтверждение этапа
-   возвращает обновлённый `Proposal` с этим полем. `GET /teams` возвращает `points`
+   возвращает `Milestone`; после действия frontend перечитывает предложения. `GET /teams` возвращает `points`
    (сумму подтверждённых наград), чтобы показать баллы команды после перезагрузки.
 
-Если Go уже возвращает другой формат — достаточно согласованно адаптировать
-`http-api.ts`. Страницы не должны отдельно знать несколько версий API.
+Списки Go возвращают `{items,total,limit,offset}` внутри `data`. Адаптер проходит все
+страницы по 100 элементов. `api-contract.ts` превращает плоский публичный снимок
+в `Task.confirmedSnapshot`, `scoreBreakdown` в `breakdown`, `timestamp` в `confirmedAt`,
+группу `constraints` в `limits`. Числовой рейтинг остаётся серверным.
+Публичный снимок не содержит владельца и приватного черновика — адаптер их не выдумывает.
 
 ## Методы
 
 | Метод | Вход | `data` в ответе |
 | --- | --- | --- |
-| `GET /tasks` | необязательные `industry`, `readiness` | `Task[]` (подтверждённые публичные сведения) |
-| `GET /tasks?scope=owned` | actor бизнеса | `Task[]` (включая рабочие поля/черновики) |
-| `GET /tasks/:id` | actor | `Task` (рабочие поля только владельцу) |
+| `GET /tasks` | необязательные `industry`, `readiness` | страница публичных снимков |
+| `GET /business/tasks` | actor бизнеса | страница `Task` (включая рабочие поля/черновики) |
+| `GET /tasks/:id` | необязательный actor | `Task` владельцу, публичный снимок остальным |
 | `POST /tasks` | `{draft,title,industry}` | `Task` |
 | `PUT /tasks/:id/card` | `{revision,title,industry,answers,fields}` | `Task` |
 | `POST /tasks/:id/confirm` | `{revision,fieldKeys,reviewed:true}` | `Task` |
 | `POST /tasks/:id/publish` | `{revision}` | `Task` |
 | `POST /ai/analyze` | `AnalyzeInput` | `AnalyzeResult` |
-| `GET /teams` | — | `Team[]`, включая `points` |
-| `GET /tasks/:id/proposals` | actor | `Proposal[]`; владельцу все, команде только свои |
+| `GET /teams` | — | страница `Team`, включая `points` |
+| `GET /tasks/:id/proposals` | actor | страница `Proposal`; владельцу все, команде только свои |
 | `POST /tasks/:id/proposals` | `{idea,plan:string[],durationDays,prototypeUrl}` | `Proposal` |
 | `POST /proposals/:id/decision` | `{decision:"accepted"\|"rejected"}` | `Proposal` |
-| `POST /proposals/:id/milestone` | `{resultText,evidenceUrl}` | `Proposal` с `milestone` |
-| `POST /milestones/:id/confirm` | `{confirmed:true}` | `Proposal` с подтверждённым `milestone` |
+| `POST /proposals/:id/milestone` | `{resultText,evidenceUrl}` | `Milestone` |
+| `POST /milestones/:id/confirm` | `{confirmed:true}` | подтверждённый `Milestone` |
 
-## Task: форма данных
+## Task: внутренняя форма frontend после адаптации
 
 ```typescript
 interface Task {
@@ -156,4 +161,5 @@ Backend всё равно обязан валидировать AI-ответ с
 7. Передать и подтвердить этап; повторный запрос даёт тот же итог, `points` увеличивается один раз.
 8. Отключить AI, проверить fallback. Отключить Go, получить понятную ошибку без подмены демо-данными.
 
-Эти пункты требуют настоящего backend и пока не отмечены проверенными.
+Проверены на локальном Go + PostgreSQL и в браузере; детали и границы проверки —
+в [отчёте интеграции](../docs/INTEGRATION.md).

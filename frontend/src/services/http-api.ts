@@ -6,14 +6,21 @@ import type {
   FieldKey,
   Gateway,
   Industry,
+  Milestone,
   Proposal,
   ProposalInput,
-  Task,
   Team,
 } from '../domain/types'
 import { ApiError } from './errors'
 import { validateSuggestions } from './demo-api'
 import { fieldKeys } from '../domain/scoring'
+import {
+  actorHeaders,
+  taskFromApi,
+  teamFromApi,
+  proposalFromApi,
+  type WireTask,
+} from './api-contract'
 
 export class HttpApi implements Gateway {
   readonly mode = 'api' as const
@@ -30,7 +37,7 @@ export class HttpApi implements Gateway {
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          'X-Demo-Actor': this._actor(),
+          ...actorHeaders(this._actor()),
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -57,31 +64,54 @@ export class HttpApi implements Gateway {
       clearTimeout(timer)
     }
   }
-  listTasks(filters: CatalogFilters = {}) {
+  private async list<T>(path: string): Promise<T[]> {
+    const items: T[] = []
+    let offset = 0
+    for (;;) {
+      const page = await this.request<{ items: T[]; total: number; limit: number }>(
+        `${path}${path.includes('?') ? '&' : '?'}limit=100&offset=${offset}`,
+      )
+      if (!page || !Array.isArray(page.items) || !Number.isInteger(page.total))
+        throw new ApiError('Ответ списка API не соответствует контракту.', 502)
+      items.push(...page.items)
+      offset += page.items.length
+      if (offset >= page.total) return items
+      if (!page.items.length) throw new ApiError('API вернул неполный список.', 502)
+    }
+  }
+  async listTasks(filters: CatalogFilters = {}) {
     const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => !!value))
-    return this.request<Task[]>(`/tasks${params.size ? `?${params}` : ''}`)
+    return (await this.list<WireTask>(`/tasks${params.size ? `?${params}` : ''}`)).map(taskFromApi)
   }
-  listOwnTasks() {
-    return this.request<Task[]>('/tasks?scope=owned')
+  async listOwnTasks() {
+    return (await this.list<WireTask>('/business/tasks')).map(taskFromApi)
   }
-  getTask(id: string) {
-    return this.request<Task>(`/tasks/${encodeURIComponent(id)}`)
+  async getTask(id: string) {
+    return taskFromApi(await this.request<WireTask>(`/tasks/${encodeURIComponent(id)}`))
   }
-  createTask(input: { draft: string; title: string; industry: Industry }) {
-    return this.request<Task>('/tasks', 'POST', input)
+  async createTask(input: { draft: string; title: string; industry: Industry }) {
+    return taskFromApi(await this.request<WireTask>('/tasks', 'POST', input))
   }
-  saveCard(id: string, input: CardInput) {
-    return this.request<Task>(`/tasks/${encodeURIComponent(id)}/card`, 'PUT', input)
+  async saveCard(id: string, input: CardInput) {
+    return taskFromApi(
+      await this.request<WireTask>(`/tasks/${encodeURIComponent(id)}/card`, 'PUT', input),
+    )
   }
-  confirmTask(id: string, revision: number, fieldKeys: FieldKey[]) {
-    return this.request<Task>(`/tasks/${encodeURIComponent(id)}/confirm`, 'POST', {
-      revision,
-      fieldKeys,
-      reviewed: true,
-    })
+  async confirmTask(id: string, revision: number, fieldKeys: FieldKey[]) {
+    return taskFromApi(
+      await this.request<WireTask>(`/tasks/${encodeURIComponent(id)}/confirm`, 'POST', {
+        revision,
+        fieldKeys,
+        reviewed: true,
+      }),
+    )
   }
-  publishTask(id: string, revision: number) {
-    return this.request<Task>(`/tasks/${encodeURIComponent(id)}/publish`, 'POST', { revision })
+  async publishTask(id: string, revision: number) {
+    return taskFromApi(
+      await this.request<WireTask>(`/tasks/${encodeURIComponent(id)}/publish`, 'POST', {
+        revision,
+      }),
+    )
   }
   async analyze(input: AnalyzeInput) {
     const result = await this.request<AnalyzeResult>('/ai/analyze', 'POST', input)
@@ -124,25 +154,31 @@ export class HttpApi implements Gateway {
       throw new ApiError('AI вернул некорректные поля. Заполните карточку вручную.', 502)
     return validateSuggestions(result, input)
   }
-  listTeams() {
-    return this.request<Team[]>('/teams')
+  async listTeams() {
+    return (await this.list<Team>('/teams')).map(teamFromApi)
   }
-  listProposals(taskId: string) {
-    return this.request<Proposal[]>(`/tasks/${encodeURIComponent(taskId)}/proposals`)
+  async listProposals(taskId: string) {
+    return (await this.list<Proposal>(`/tasks/${encodeURIComponent(taskId)}/proposals`)).map(
+      proposalFromApi,
+    )
   }
-  createProposal(taskId: string, input: ProposalInput) {
-    return this.request<Proposal>(`/tasks/${encodeURIComponent(taskId)}/proposals`, 'POST', input)
+  async createProposal(taskId: string, input: ProposalInput) {
+    return proposalFromApi(
+      await this.request<Proposal>(`/tasks/${encodeURIComponent(taskId)}/proposals`, 'POST', input),
+    )
   }
-  decideProposal(id: string, decision: 'accepted' | 'rejected') {
-    return this.request<Proposal>(`/proposals/${encodeURIComponent(id)}/decision`, 'POST', {
-      decision,
-    })
+  async decideProposal(id: string, decision: 'accepted' | 'rejected') {
+    return proposalFromApi(
+      await this.request<Proposal>(`/proposals/${encodeURIComponent(id)}/decision`, 'POST', {
+        decision,
+      }),
+    )
   }
   submitMilestone(id: string, input: { resultText: string; evidenceUrl: string }) {
-    return this.request<Proposal>(`/proposals/${encodeURIComponent(id)}/milestone`, 'POST', input)
+    return this.request<Milestone>(`/proposals/${encodeURIComponent(id)}/milestone`, 'POST', input)
   }
   confirmMilestone(id: string) {
-    return this.request<Proposal>(`/milestones/${encodeURIComponent(id)}/confirm`, 'POST', {
+    return this.request<Milestone>(`/milestones/${encodeURIComponent(id)}/confirm`, 'POST', {
       confirmed: true,
     })
   }

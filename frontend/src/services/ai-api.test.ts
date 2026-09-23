@@ -18,7 +18,9 @@ describe('AI adapter', () => {
       '/api/ai/chat',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'X-Demo-Actor': 'team-3' }),
+        headers: expect.objectContaining({
+          'X-Demo-Actor': 'team:00000000-0000-4000-8000-000000000003',
+        }),
       }),
     )
   })
@@ -37,7 +39,9 @@ describe('AI adapter', () => {
     )
     expect(result.text).toContain('магазина')
     const options = fetcher.mock.calls[0]?.[1] as RequestInit
-    expect(options.headers).toMatchObject({ 'X-Demo-Actor': 'demo-business-1' })
+    expect(options.headers).toMatchObject({
+      'X-Demo-Actor': 'business:10000000-0000-4000-8000-000000000001',
+    })
     expect(options.body).toBeInstanceOf(FormData)
     expect((options.body as FormData).get('context')).toBe('Описание задачи')
   })

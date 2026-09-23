@@ -5,7 +5,13 @@ import { transcribeAudio } from '../services/ai-api'
 import AppIcon from './AppIcon.vue'
 
 const props = withDefaults(
-  defineProps<{ modelValue?: string; context: string; label?: string; maxLength?: number }>(),
+  defineProps<{
+    modelValue?: string
+    context: string
+    label?: string
+    maxLength?: number
+    disabled?: boolean
+  }>(),
   { modelValue: '', label: 'Добавить голосом', maxLength: 3000 },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -20,6 +26,8 @@ let chunks: Blob[] = []
 let interval: number | undefined
 let timeout: number | undefined
 let request: AbortController | undefined
+let disposed = false
+const requesting = ref(false)
 
 const time = computed(
   () =>
@@ -39,7 +47,7 @@ function closeStream() {
 }
 
 async function start() {
-  if (state.value !== 'idle') return
+  if (state.value !== 'idle' || requesting.value || props.disabled) return
   error.value = ''
   success.value = ''
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -47,7 +55,12 @@ async function start() {
     return
   }
   try {
+    requesting.value = true
     stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    if (disposed) {
+      closeStream()
+      return
+    }
     const preferred = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((type) =>
       MediaRecorder.isTypeSupported(type),
     )
@@ -57,6 +70,13 @@ async function start() {
       if (event.data.size) chunks.push(event.data)
     }
     recorder.onstop = upload
+    recorder.onerror = () => {
+      clearTimers()
+      if (recorder) recorder.onstop = null
+      closeStream()
+      state.value = 'idle'
+      error.value = 'Запись прервалась. Попробуйте ещё раз или введите ответ текстом.'
+    }
     recorder.start(250)
     elapsed.value = 0
     state.value = 'recording'
@@ -68,11 +88,14 @@ async function start() {
       err instanceof DOMException && ['NotAllowedError', 'PermissionDeniedError'].includes(err.name)
         ? 'Разрешите доступ к микрофону в браузере и попробуйте снова.'
         : 'Не удалось включить микрофон. Введите ответ текстом.'
+  } finally {
+    requesting.value = false
   }
 }
 
 function stop() {
-  if (state.value !== 'recording') return
+  if (state.value !== 'recording' || recorder?.state !== 'recording') return
+  state.value = 'transcribing'
   clearTimers()
   recorder?.stop()
   closeStream()
@@ -107,6 +130,7 @@ async function upload() {
 }
 
 onBeforeUnmount(() => {
+  disposed = true
   clearTimers()
   request?.abort()
   if (recorder?.state === 'recording') {
@@ -119,8 +143,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="voice-recorder" :class="state">
-    <button v-if="state === 'idle'" type="button" class="voice-button" @click="start">
-      <span><AppIcon name="Mic" :size="18" /></span>{{ props.label }}
+    <button
+      v-if="state === 'idle'"
+      type="button"
+      class="voice-button"
+      :disabled="disabled || requesting"
+      @click="start"
+    >
+      <span><AppIcon name="Mic" :size="18" /></span
+      >{{ requesting ? 'Ожидаем разрешение…' : props.label }}
     </button>
     <button
       v-else-if="state === 'recording'"

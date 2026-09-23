@@ -136,6 +136,9 @@ export interface Gateway {
   listProposals(taskId: string): Promise<Proposal[]>
   createProposal(taskId: string, input: ProposalInput): Promise<Proposal>
   decideProposal(id: string, decision: 'accepted' | 'rejected'): Promise<Proposal>
-  submitMilestone(id: string, input: { resultText: string; evidenceUrl: string }): Promise<Proposal>
-  confirmMilestone(id: string): Promise<Proposal>
+  submitMilestone(
+    id: string,
+    input: { resultText: string; evidenceUrl: string },
+  ): Promise<Proposal | Milestone>
+  confirmMilestone(id: string): Promise<Proposal | Milestone>
 }
