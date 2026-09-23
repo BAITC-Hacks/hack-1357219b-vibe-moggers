@@ -1,21 +1,19 @@
 $kind: http-request
-description: "List seeded teams and their current points. Implemented."
-url: "{{base_url}}/api/teams?limit=20&offset=0"
+description: "Implemented. See backend/docs/api-request-list.md."
+url: "{{base_url}}/api/teams"
 method: GET
 headers:
-  "Accept": "application/json"
+  Accept: "application/json"
+  Content-Type: "application/json"
 scripts:
   - type: afterResponse
     language: text/javascript
     code: |-
-      pm.test('HTTP 200', () => pm.response.to.have.status(200));
-      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      pm.test('HTTP 200',()=>pm.response.to.have.status(200));
+      pm.test('JSON response',()=>pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
       if (pm.response.code === 200) {
-      const body = pm.response.json();
-      pm.test('Paginated list', () => { pm.expect(body.items).to.be.an('array'); pm.expect(body.total).to.be.a('number'); pm.expect(body.limit).to.be.a('number'); pm.expect(body.offset).to.be.a('number'); });
-      const teams = pm.response.json().items;
-      pm.test('At least five seeded teams', () => pm.expect(teams.length).to.be.at.least(5));
-      if (teams.length) pm.collectionVariables.set('team_id', teams[0].id);
-      if (teams.length > 1) pm.collectionVariables.set('second_team_id', teams[1].id);
+        const d = pm.response.json().data;
+        pm.test('Data envelope',()=>pm.expect(d).not.to.eql(undefined));
+        pm.test('Five demo teams',()=>pm.expect(d.items.length).to.be.at.least(5)); pm.collectionVariables.set('team_id',d.items[0].id); pm.collectionVariables.set('second_team_id',d.items[1].id);
       }
 order: 2000

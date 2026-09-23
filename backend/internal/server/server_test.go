@@ -28,13 +28,13 @@ func TestHealth(t *testing.T) {
 		{
 			name:       "database connected",
 			wantStatus: http.StatusOK,
-			wantBody:   "{\"database\":\"connected\",\"status\":\"ok\"}\n",
+			wantBody:   "{\"data\":{\"aiMode\":\"fallback\",\"database\":\"connected\",\"status\":\"ok\"}}\n",
 		},
 		{
 			name:       "database unavailable",
 			pingError:  errors.New("connection failed"),
 			wantStatus: http.StatusServiceUnavailable,
-			wantBody:   "{\"database\":\"unavailable\",\"status\":\"degraded\"}\n",
+			wantBody:   "{\"error\":{\"code\":\"database_unavailable\",\"message\":\"Database is unavailable.\"}}\n",
 		},
 	}
 
@@ -57,5 +57,20 @@ func TestHealth(t *testing.T) {
 				t.Fatalf("Content-Type = %q, want application/json", contentType)
 			}
 		})
+	}
+}
+
+func TestDemoDisabledAndCanonicalHealth(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := NewConfigured(stubPinger{}, logger, "live", false)
+	for _, tt := range []struct {
+		path string
+		want int
+	}{{"/api/tasks", 503}, {"/api/health", 200}, {"/health", 200}} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", tt.path, nil))
+		if w.Code != tt.want {
+			t.Fatalf("%s got %d", tt.path, w.Code)
+		}
 	}
 }

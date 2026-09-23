@@ -50,7 +50,11 @@ func Fail(w http.ResponseWriter, logger *slog.Logger, err error) {
 
 func Decode(w http.ResponseWriter, r *http.Request, dest any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
-	decoder := json.NewDecoder(r.Body)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil || len(strings.TrimSpace(string(raw))) == 0 || strings.TrimSpace(string(raw))[0] != '{' {
+		return Problem(400, "invalid_json", "Expected a JSON object within the request size limit.")
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dest); err != nil {
 		return Problem(400, "invalid_json", "Expected a JSON object with known fields.")
@@ -122,5 +126,18 @@ func Pagination(r *http.Request) (Page, error) {
 }
 
 func List(w http.ResponseWriter, items any, total int, page Page) {
-	JSON(w, 200, map[string]any{"items": items, "total": total, "limit": page.Limit, "offset": page.Offset})
+	Data(w, 200, map[string]any{"items": items, "total": total, "limit": page.Limit, "offset": page.Offset})
+}
+
+func Data(w http.ResponseWriter, status int, value any) {
+	JSON(w, status, map[string]any{"data": value})
+}
+
+func Identity(r *http.Request) (role, id string, err error) {
+	role, _, _ = strings.Cut(r.Header.Get("X-Demo-Actor"), ":")
+	if role != "business" && role != "team" {
+		return "", "", Problem(401, "invalid_actor", "Select business:UUID or team:UUID.")
+	}
+	id, err = Actor(r, role)
+	return
 }

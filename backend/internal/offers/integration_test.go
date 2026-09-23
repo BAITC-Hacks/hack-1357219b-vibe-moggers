@@ -109,6 +109,12 @@ func (f fixture) call(t *testing.T, method, path, actor, body string, want int) 
 	if w.Header().Get("Content-Type") != "application/json" {
 		t.Fatal("expected JSON response")
 	}
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err == nil && len(envelope.Data) > 0 {
+		return envelope.Data
+	}
 	return w.Body.Bytes()
 }
 
@@ -130,16 +136,14 @@ func (f fixture) task(t *testing.T, published bool) string {
 func (f fixture) team(t *testing.T) string {
 	t.Helper()
 	body := f.call(t, "POST", "/api/teams", "", `{"name":"Student team"}`, 201)
-	var response struct {
-		Team teams.Team `json:"team"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil {
+	var team teams.Team
+	if err := json.Unmarshal(body, &team); err != nil {
 		t.Fatal(err)
 	}
-	if response.Team.Points != 0 || response.Team.Name != "Student team" || !httpapi.UUID(response.Team.ID) {
-		t.Fatalf("unexpected profile: %+v", response.Team)
+	if team.Points != 0 || team.Name != "Student team" || !httpapi.UUID(team.ID) {
+		t.Fatalf("unexpected profile: %+v", team)
 	}
-	return response.Team.ID
+	return team.ID
 }
 
 func (f fixture) offer(t *testing.T, taskID, teamID string, legacy bool) offers.Offer {
@@ -148,8 +152,11 @@ func (f fixture) offer(t *testing.T, taskID, teamID string, legacy bool) offers.
 	if legacy {
 		path = "/api/tasks/" + taskID + "/proposals"
 	}
-	body := f.call(t, "POST", path, "team:"+teamID,
-		fmt.Sprintf(`{"team_id":%q,"solution_idea":"Сравнение услуг","plan":"1. Собрать данные\n2. Сделать прототип\n3. Проверить","timeline":"One week","prototype_link":"https://example.org/demo"}`, teamID), 201)
+	input := fmt.Sprintf(`{"team_id":%q,"solution_idea":"Сравнение услуг","plan":"1. Собрать данные\n2. Сделать прототип\n3. Проверить","timeline":"One week","prototype_link":"https://example.org/demo"}`, teamID)
+	if legacy {
+		input = `{"idea":"Compare services","plan":["Collect data","Build prototype"],"durationDays":7,"prototypeUrl":"https://example.org/demo"}`
+	}
+	body := f.call(t, "POST", path, "team:"+teamID, input, 201)
 	var response struct {
 		Offer    offers.Offer `json:"offer"`
 		Proposal offers.Offer `json:"proposal"`
@@ -159,7 +166,11 @@ func (f fixture) offer(t *testing.T, taskID, teamID string, legacy bool) offers.
 	}
 	result, want := response.Offer, "pending"
 	if legacy {
-		result, want = response.Proposal, "submitted"
+		var p offers.Proposal
+		if err := json.Unmarshal(body, &p); err != nil {
+			t.Fatal(err)
+		}
+		result = offers.Offer{ID: p.ID, TaskID: p.TaskID, TeamID: p.TeamID, Status: p.Status, DecidedAt: p.DecidedAt}
 	}
 	if result.Status != want || result.TeamID != teamID || result.TaskID != taskID || result.DecidedAt != nil {
 		t.Fatalf("unexpected new offer: %+v", result)
@@ -175,10 +186,8 @@ func (f fixture) decide(t *testing.T, id, status string) {
 func (f fixture) points(t *testing.T, id string, want int) {
 	t.Helper()
 	body := f.call(t, "GET", "/api/teams/"+id, "", "", 200)
-	var response struct {
-		Team teams.Team `json:"team"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil || response.Team.Points != want {
+	var team teams.Team
+	if err := json.Unmarshal(body, &team); err != nil || team.Points != want {
 		t.Fatalf("team points: %s, want %d, err=%v", body, want, err)
 	}
 }
@@ -205,20 +214,20 @@ func TestBlock2Postgres(t *testing.T) {
 			f.decide(t, first.ID, "accepted")
 		}
 		f.call(t, "POST", "/api/proposals/"+second.ID+"/accept", "business:"+owner, "", 200)
-		f.points(t, a, 10)
-		f.points(t, b, 10)
+		f.points(t, a, 0)
+		f.points(t, b, 0)
 		f.state(t, task, "in_progress")
 		third := f.offer(t, task, a, false) // Work in progress still accepts offers.
 		body := f.call(t, "GET", "/api/tasks/"+task+"/offers?status=accepted&limit=1", "business:"+owner, "", 200)
 		var list struct {
-			Items []offers.Offer `json:"items"`
-			Total int            `json:"total"`
+			Items []struct{ ID, Status string } `json:"items"`
+			Total int                           `json:"total"`
 		}
 		if err := json.Unmarshal(body, &list); err != nil || list.Total != 2 || len(list.Items) != 1 {
 			t.Fatalf("filtered pagination: %s, err=%v", body, err)
 		}
-		body = f.call(t, "GET", "/api/tasks/"+task+"/proposals?status=submitted", "business:"+owner, "", 200)
-		if err := json.Unmarshal(body, &list); err != nil || list.Total != 1 || list.Items[0].ID != third.ID || list.Items[0].Status != "submitted" {
+		body = f.call(t, "GET", "/api/tasks/"+task+"/proposals?status=pending", "business:"+owner, "", 200)
+		if err := json.Unmarshal(body, &list); err != nil || list.Total != 1 || list.Items[0].ID != third.ID || list.Items[0].Status != "pending" {
 			t.Fatalf("other offers must remain pending: %s, err=%v", body, err)
 		}
 		body = f.call(t, "GET", "/api/tasks/"+task+"/offers?offset=999", "business:"+owner, "", 200)
@@ -231,24 +240,22 @@ func TestBlock2Postgres(t *testing.T) {
 		}
 		defer freshDB.Close()
 		fresh := fixture{db: freshDB, handler: handler(freshDB, tasks.SQLAccess{})}
-		fresh.points(t, a, 10)
+		fresh.points(t, a, 0)
 		fresh.state(t, task, "in_progress")
 		fresh.decide(t, first.ID, "accepted")
-		fresh.points(t, a, 10)
+		fresh.points(t, a, 0)
 	})
-	t.Run("reject all and correct decisions without repeat awards", func(t *testing.T) {
+	t.Run("reject all and prohibit reversing final decisions", func(t *testing.T) {
 		task, team := f.task(t, true), f.team(t)
 		a, b := f.offer(t, task, team, false), f.offer(t, task, team, false)
 		f.decide(t, a.ID, "rejected")
 		f.decide(t, b.ID, "rejected")
 		f.points(t, team, 0)
 		f.state(t, task, "open")
-		f.decide(t, a.ID, "accepted")
+		f.call(t, "PATCH", "/api/offers/"+a.ID+"/status", "business:"+owner, `{"status":"accepted"}`, 409)
 		f.call(t, "POST", "/api/proposals/"+a.ID+"/reject", "business:"+owner, "", 200)
 		f.state(t, task, "open")
-		f.decide(t, a.ID, "accepted")
-		f.points(t, team, 10)
-		f.state(t, task, "in_progress")
+		f.points(t, team, 0)
 	})
 	t.Run("ownership, publication and validation", func(t *testing.T) {
 		task, team := f.task(t, true), f.team(t)
@@ -273,7 +280,7 @@ func TestBlock2Postgres(t *testing.T) {
 		f.points(t, team, 0)
 		f.state(t, task, "open")
 	})
-	t.Run("concurrent acceptance is awarded once per offer", func(t *testing.T) {
+	t.Run("concurrent acceptance never awards progress points", func(t *testing.T) {
 		task, team := f.task(t, true), f.team(t)
 		a, b := f.offer(t, task, team, false), f.offer(t, task, team, false)
 		var wg sync.WaitGroup
@@ -297,10 +304,10 @@ func TestBlock2Postgres(t *testing.T) {
 		for failure := range failures {
 			t.Error(failure)
 		}
-		f.points(t, team, 20)
+		f.points(t, team, 0)
 		f.state(t, task, "in_progress")
 		var count int
-		if err := f.db.QueryRow(`SELECT count(*) FROM point_awards WHERE team_id = $1`, team).Scan(&count); err != nil || count != 2 {
+		if err := f.db.QueryRow(`SELECT count(*) FROM point_awards WHERE team_id = $1`, team).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("award count = %d, err=%v", count, err)
 		}
 	})
@@ -323,7 +330,7 @@ func TestBlock2Postgres(t *testing.T) {
 			t.Fatalf("award rollback: %d, %v", awards, err)
 		}
 		f.decide(t, offer.ID, "accepted")
-		f.points(t, team, 10)
+		f.points(t, team, 0)
 	})
 }
 

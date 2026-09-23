@@ -2,10 +2,10 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
+	"vibe-moggers/backend/internal/httpapi"
 )
 
 type databasePinger interface {
@@ -15,10 +15,14 @@ type databasePinger interface {
 type Server struct {
 	db     databasePinger
 	logger *slog.Logger
+	aiMode string
 }
 
 func New(db databasePinger, logger *slog.Logger, register ...func(*http.ServeMux)) http.Handler {
-	server := &Server{db: db, logger: logger}
+	return NewConfigured(db, logger, "fallback", true, register...)
+}
+func NewConfigured(db databasePinger, logger *slog.Logger, aiMode string, demoMode bool, register ...func(*http.ServeMux)) http.Handler {
+	server := &Server{db: db, logger: logger, aiMode: aiMode}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", server.health)
@@ -27,7 +31,13 @@ func New(db databasePinger, logger *slog.Logger, register ...func(*http.ServeMux
 		routes(mux)
 	}
 
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !demoMode && r.URL.Path != "/health" && r.URL.Path != "/api/health" {
+			httpapi.Fail(w, logger, httpapi.Problem(503, "demo_disabled", "Demo identity is disabled. Production authentication is not implemented."))
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +45,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{
 		"status":   "ok",
 		"database": "connected",
+		"aiMode":   s.aiMode,
 	}
 
 	pingCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -47,14 +58,9 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("database health check failed", "error", err)
 	}
 
-	writeJSON(w, statusCode, response)
-}
-
-func writeJSON(w http.ResponseWriter, statusCode int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(value); err != nil {
-		slog.Error("failed to encode JSON response", "error", err)
+	if statusCode != 200 {
+		httpapi.Fail(w, s.logger, httpapi.Problem(statusCode, "database_unavailable", "Database is unavailable."))
+		return
 	}
+	httpapi.Data(w, statusCode, response)
 }

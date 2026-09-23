@@ -1,17 +1,19 @@
 $kind: http-request
-description: "Planned; returns 404 until implemented. Get public task. See backend/docs/api-request-list.md for the contract."
+description: "Implemented. See backend/docs/api-request-list.md."
 url: "{{base_url}}/api/tasks/{{task_id}}"
 method: GET
 headers:
-  "Accept": "application/json"
+  Accept: "application/json"
+  Content-Type: "application/json"
 scripts:
   - type: afterResponse
     language: text/javascript
     code: |-
-      pm.test('HTTP 200', () => pm.response.to.have.status(200));
-      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      pm.test('HTTP 200',()=>pm.response.to.have.status(200));
+      pm.test('JSON response',()=>pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
       if (pm.response.code === 200) {
-      const t = pm.response.json().task;
-      pm.test('Public task is published and confirmed', () => { pm.expect(t.id).to.eql(pm.collectionVariables.get('task_id')); pm.expect(t.status).to.eql('published'); pm.expect(t.rating.score).to.eql(100); pm.expect(t).not.to.have.property('questions'); pm.expect(t).not.to.have.property('raw_description'); });
+        const d = pm.response.json().data;
+        pm.test('Data envelope',()=>pm.expect(d).not.to.eql(undefined));
+        pm.test('No private draft',()=>pm.expect(d).not.to.have.property('draft')); pm.test('Published score 40',()=>pm.expect(d.total).to.eql(40));
       }
-order: 2000
+order: 13000

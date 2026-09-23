@@ -21,7 +21,7 @@ type Team struct {
 	Interests    []string  `json:"interests"`
 	Skills       []string  `json:"skills"`
 	Technologies []string  `json:"technologies"`
-	CreatedAt    time.Time `json:"created_at"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type Handler struct {
@@ -39,7 +39,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/teams/{team_id}", h.get)
 }
 
-const columns = `id, name, points, interests, skills, technologies, created_at`
+const columns = `id, name, COALESCE((SELECT SUM(a.points) FROM progress_awards a WHERE a.team_id=teams.id),0), interests, skills, technologies, created_at`
 
 type scanner interface{ Scan(...any) error }
 
@@ -84,7 +84,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, h.logger, err)
 		return
 	}
-	httpapi.JSON(w, 201, map[string]any{"team": team})
+	httpapi.Data(w, 201, team)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		httpapi.Fail(w, h.logger, err)
 		return
 	}
-	httpapi.JSON(w, 200, map[string]any{"team": team})
+	httpapi.Data(w, 200, team)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

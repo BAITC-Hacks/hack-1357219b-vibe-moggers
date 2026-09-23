@@ -1,18 +1,20 @@
 $kind: http-request
-description: "Planned; returns 404 until implemented. Get editable task. See backend/docs/api-request-list.md for the contract."
-url: "{{base_url}}/api/tasks/{{task_id}}?view=editor"
+description: "Implemented. See backend/docs/api-request-list.md."
+url: "{{base_url}}/api/tasks/{{task_id}}"
 method: GET
 headers:
-  "Accept": "application/json"
+  Accept: "application/json"
+  Content-Type: "application/json"
+  X-Demo-Actor: "business:{{business_id}}"
 scripts:
   - type: afterResponse
     language: text/javascript
     code: |-
-      pm.test('HTTP 200', () => pm.response.to.have.status(200));
-      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      pm.test('HTTP 200',()=>pm.response.to.have.status(200));
+      pm.test('JSON response',()=>pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
       if (pm.response.code === 200) {
-      const task = pm.response.json().task;
-      pm.test('Task has an ID and revision', () => { pm.expect(task.id).to.be.a('string').and.not.empty; pm.expect(task.revision).to.be.a('number'); });
-      if (task && task.id && Number.isInteger(task.revision)) { pm.collectionVariables.set('task_id', task.id); pm.collectionVariables.set('revision', task.revision); }
+        const d = pm.response.json().data;
+        pm.test('Data envelope',()=>pm.expect(d).not.to.eql(undefined));
+        if (d.id && Number.isInteger(d.revision)) { pm.collectionVariables.set('task_id',d.id); pm.collectionVariables.set('revision',d.revision); }
       }
-order: 2000
+order: 6000

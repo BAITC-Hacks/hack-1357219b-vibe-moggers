@@ -4,33 +4,35 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"vibe-moggers/backend/internal/app"
 	"vibe-moggers/backend/internal/config"
 	"vibe-moggers/backend/internal/database"
-	"vibe-moggers/backend/internal/offers"
-	"vibe-moggers/backend/internal/server"
-	"vibe-moggers/backend/internal/tasks"
-	"vibe-moggers/backend/internal/teams"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if err := run(logger); err != nil {
+		logger.Error("API stopped", "error", err)
+		os.Exit(1)
+	}
+}
+func run(logger *slog.Logger) error {
 
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error("failed to load configuration", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	db, err := database.Open(cfg.DatabaseURL)
 	if err != nil {
-		logger.Error("failed to connect to database", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer db.Close()
 
@@ -38,35 +40,36 @@ func main() {
 	err = database.Migrate(migrationCtx, db)
 	cancelMigrations()
 	if err != nil {
-		logger.Error("failed to migrate database", "error", err)
-		os.Exit(1)
+		return err
 	}
-	teamHandler := teams.NewHandler(db, logger)
-	offerHandler := offers.NewHandler(offers.NewStore(db, tasks.SQLAccess{}), logger)
 
 	httpServer := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           server.New(db, logger, teamHandler.Register, offerHandler.Register),
+		Addr:              "127.0.0.1:" + cfg.Port,
+		Handler:           app.New(db, cfg, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      25 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
+	listener, err := net.Listen("tcp", httpServer.Addr)
+	if err != nil {
+		return err
+	}
 	serverErrors := make(chan error, 1)
 	go func() {
 		logger.Info("API server started", "address", httpServer.Addr)
-		serverErrors <- httpServer.ListenAndServe()
+		serverErrors <- httpServer.Serve(listener)
 	}()
 
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(shutdownSignal)
 
 	select {
 	case err := <-serverErrors:
 		if !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("API server stopped unexpectedly", "error", err)
-			os.Exit(1)
+			return err
 		}
 	case sig := <-shutdownSignal:
 		logger.Info("shutdown signal received", "signal", sig.String())
@@ -76,9 +79,10 @@ func main() {
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		logger.Error("graceful shutdown failed", "error", err)
-		os.Exit(1)
+		httpServer.Close()
+		return err
 	}
 
 	logger.Info("API server stopped")
+	return nil
 }

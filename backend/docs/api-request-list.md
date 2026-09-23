@@ -1,383 +1,133 @@
-# MVP pages and API contract
+# Frontend API Contract
 
-Status: teams, proposals/offers, decisions and acceptance awards are implemented,
-along with `GET /health` and `/api/health`. Task builder, AI and catalog routes
-remain planned. See [block 2](block2.md) for implemented canonical `/offers`
-routes, +10 awards, request examples, and the shared task schema boundary.
-The Postman `/proposals` routes below remain compatible aliases.
+Base: `http://127.0.0.1:8080/api`. JSON request bodies. Success: `{"data":...}`.
+Lists: `{"data":{"items":[],"total":0,"limit":20,"offset":0}}`.
+Errors: `{"error":{"code":"...","message":"...","fields":{}}}`; `fields` is optional.
+Pagination accepts `limit=1..100`, `offset>=0`. Identifiers are UUIDs; dates are UTC.
+Protected requests use `X-Demo-Actor: business:UUID` or `team:UUID`. These are local
+demo roles, not production authentication. Never send the OpenAI key to these routes.
 
-## Pages and requests
+## 1. Task Builder: /tasks/new and /tasks/:id/edit
 
-1. **Shared catalog** - frontend `/catalog`
-   - `GET /api/catalog?topic=retail&readiness=ready&sort=rating_desc&limit=20&offset=0`
-   - Show title, topic, confirmed rating, readiness, and a short need summary.
-   - Empty filters mean all published tasks. Include published 0-39 tasks.
-2. **Task details + proposal form** - frontend `/tasks/:taskId`
-   - `GET /api/tasks/{task_id}` - published, confirmed card and rating.
-   - `GET /api/teams` - seeded team selector; load once and cache.
-   - `POST /api/tasks/{task_id}/proposals` - submit from an inline form/modal.
-   - No separate application wizard or team profile page is needed.
-3. **Business task list** - frontend `/business/tasks`
-   - `GET /api/tasks?status=draft&limit=20&offset=0`
-   - Omit status for all business demo tasks; allow draft/confirmed/published.
-   - Show status, title or raw description, rating, proposal_count, and links
-     to edit/review. Creating a task opens the builder.
-4. **Task builder** - frontend `/business/tasks/new` or `/business/tasks/:taskId/edit`
-   - `POST /api/tasks/draft` - save the initial description and topic.
-   - `GET /api/tasks/{task_id}?view=editor` - resume saved work.
-   - `POST /api/tasks/{task_id}/questions` - generate at least 3 questions.
-   - `PUT /api/tasks/{task_id}/answers` - save answers by question ID.
-   - `POST /api/tasks/{task_id}/generate-card` - create an editable AI draft.
-   - `PUT /api/tasks/{task_id}` - save the entire editable card.
-   - `GET /api/tasks/{task_id}/rating` - official rating plus draft preview.
-   - `POST /api/tasks/{task_id}/confirm` - human confirms the current revision.
-   - `POST /api/tasks/{task_id}/publish` - publish a confirmed card.
-   - These are steps/tabs on one page. Questions, rating, and missing fields
-     are panels, not separate pages.
-5. **Business proposal review** - frontend `/business/tasks/:taskId/proposals`
-   - `GET /api/tasks/{task_id}?view=editor` - task heading and context.
-   - `GET /api/tasks/{task_id}/proposals?status=submitted&limit=20&offset=0`
-   - `POST /api/proposals/{proposal_id}/accept`
-   - `POST /api/proposals/{proposal_id}/reject`
-   - Compare team, idea, plan, timeline, prototype link and decision inline.
+| Request | Body/purpose |
+| --- | --- |
+| `POST /tasks` | `{draft,title,industry}`; business actor; returns private Task, revision=1 |
+| `GET /tasks/:id` | Owner gets editable Task; others get only the published snapshot, or 404 |
+| `POST /ai/analyze` | `{stage:"clarify",sources:[{id:"draft",text:"..."}],currentFields:{}}` |
+| `PUT /tasks/:id/card` | `{revision,title?,industry?,answers?,fields?}` saves answers/fields, returns Task and preview |
+| `POST /ai/analyze` | Same schema with `stage:"assemble"`, saved answers as additional sources |
+| `POST /tasks/:id/confirm` | `{revision,fieldKeys:["context",...],reviewed:true}`; updates snapshot and revision |
+| `POST /tasks/:id/publish` | `{revision}`; requires current reviewed snapshot, title and industry; no minimum score |
 
-Infrastructure: `GET /health`. No UI page required.
+`draft` is required, max 20000 characters. Title max 200, industry max 100.
+Store the latest returned `revision` after every mutation. A stale one returns 409.
+Publish is idempotent at the current confirmed revision and does not increment it.
+No separate questions, answers, generate-card or rating endpoints are necessary.
 
-No XP dashboard, streaks, leaderboard, chat, notifications, calendar, login
-flow, or full project tracker. The brief mentions milestone points in its
-extended scenario, but explicitly says a proposal and business decision suffice
-for the demo. Keep milestone tracking deferred, not a mandatory screen.
-
-## Shared conventions
-
-- API origin: `http://localhost:8080`; JSON request and response bodies.
-- IDs are UUID strings; timestamps are UTC RFC 3339 strings.
-- Task path variable `{task_id}` means the same ID through the whole lifecycle.
-- Single task replies use `{"task": {...}}`; proposal replies use
-  `{"proposal": {...}}`. Lists use
-  `{"items": [], "total": 0, "limit": 20, "offset": 0}`.
-- List defaults: limit 20, offset 0; limit 1-100, offset >= 0.
-  Invalid query enum/number values return 400.
-- Catalog sort: `rating_desc` (default) or `newest`. Rating ties use
-  published_at descending, then id ascending for stable paging.
-- Topic is a trimmed category slug, e.g. `retail`, `education`,
-  `logistics`. It is the draft's industry/category. Topic filtering is exact.
-- Readiness: `draft`, `workable`, `ready`, `priority`.
-  Readiness `draft` is a score band; task status `draft` is unpublished.
-- Demo identity for block 2: `X-Demo-Actor: team:<UUID>` on submissions,
-  `X-Demo-Actor: business:<UUID>` on review/decisions. The business UUID must
-  match `tasks.owner_id`. Optional `team_id` must match the header's team.
-  These are local demo selectors, not authenticated production identities.
-  Five demo teams are seeded once by the startup migration.
-- OpenAI credentials stay on the backend. Never send them from the frontend or
-  put them in Postman. AI responses include `ai: {"provider":"openai",
-  "fallback_used":false}`; a stub uses provider `stub`, fallback_used true.
-- Server should allow the agreed frontend origin with CORS when implementing
-  these routes. CORS is still pending; block 2 domain routes are implemented.
-
-## Lifecycle and confirmation
-
-A draft starts with an empty card, score 0, revision 1, status `draft`.
-Saving answers, generating questions/card, or editing increments revision.
-Returning already saved questions does not increment it. Editing an unpublished
-confirmed task returns its status to draft while preserving the prior confirmed
-snapshot. Confirm and publish do not change the content revision.
-Mutations of an existing task include its last `revision`; stale values
-return 409. Confirm/publish also require revision and return the latest task.
-
-AI generation and manual editing never silently confirm facts. The editor
-shows a preview score, labelled "pending confirmation". Confirm copies the
-current card into the confirmed snapshot, recalculates the official rating,
-and records confirmed_revision. For an unpublished task this sets status
-`confirmed`. Publish requires confirmed_revision == revision and changes
-status to `published`. There is no minimum score for publication or proposals.
-
-For subsequent edits, retain the last confirmed snapshot and official rating.
-The editor sees the new working card and preview; public readers see only the
-confirmed snapshot. On the next explicit confirmation, the public card and its
-rating update together. An already published task stays published. This avoids
-showing unconfirmed AI changes in the catalog.
-
-Repeated confirm/publish on the same current revision are harmless 200 replies.
-Question generation is an explicit initial action: once saved questions exist,
-return them without regenerating IDs or losing answers. Regeneration of
-questions is deferred. Card generation is allowed to replace the working card
-only after a deliberate user action; the UI should warn if manual edits exist.
-
-## Request bodies and responses
-
-### Task creation and retrieval
-
-`POST /api/tasks/draft` -> 201
-```json
-{"raw_description":"Customers cannot easily compare our services.","topic":"retail"}
-```
-raw_description: 1-10000 trimmed characters; topic: 1-80 characters.
-Returns a task with empty strings for all card fields, empty questions,
-rating score 0, preview score 0, and revision 1.
-
-`GET /api/tasks/{task_id}?view=editor` -> 200
-returns the workspace task shape below, including saved questions/answers.
-The default GET is public and returns 404 for unpublished tasks. It uses the
-confirmed snapshot and omits raw_description, working card and questions.
-Task lists return summary objects with id, title, raw_description (business
-list only), topic, status, rating, proposal_count, created_at, published_at.
-
-Workspace task response shape:
-```json
-{
-  "task": {
-    "id": "UUID",
-    "raw_description": "Customers cannot easily compare our services.",
-    "topic": "retail",
-    "status": "draft",
-    "revision": 1,
-    "confirmed_revision": null,
-    "card": {
-      "title": "", "context": "", "need": "", "users": "", "data": "",
-      "constraints": "", "expected_result": "", "success_criteria": "",
-      "contact": "", "interaction_format": ""
-    },
-    "questions": [],
-    "rating": {
-      "score": 0, "level": "draft", "breakdown": [], "missing_fields": []
-    },
-    "rating_preview": {
-      "score": 0, "level": "draft", "breakdown": [], "missing_fields": []
-    },
-    "proposal_count": 0,
-    "created_at": "2026-09-23T08:00:00Z",
-    "updated_at": "2026-09-23T08:00:00Z",
-    "published_at": null
-  }
-}
-```
-The empty breakdown/missing_fields arrays above abbreviate the response;
-actual ratings always contain all seven breakdown categories and every
-missing card field, including title. `rating` always describes confirmed
-content; `rating_preview` describes the working card.
-
-### Questions, answers and card
-
-`POST /api/tasks/{task_id}/questions` -> 200
-```json
-{"revision":1}
-```
-Returns task wrapper plus ai metadata; task.questions has at least 3 objects:
-`{"id":"UUID","field":"users","question":"Who will use this?","answer":""}`.
-field is a card field name; IDs are persistent, not array indices.
-
-`PUT /api/tasks/{task_id}/answers` -> 200
-```json
-{"revision":2,"answers":[{"question_id":"UUID","answer":"Our retail customers."}]}
-```
-Upserts supplied answers and preserves omitted ones; unknown or duplicate
-question IDs return 422. At least one answer entry, at most 10000 characters
-per answer; an empty answer clears it. Returns task wrapper.
-
-`POST /api/tasks/{task_id}/generate-card` -> 200
-```json
-{"revision":3}
-```
-Requires saved questions and at least one nonempty answer, else 409. Uses only
-the draft and saved answers; unknown facts remain empty strings. Returns
-task wrapper plus ai metadata. Invalid AI output must be validated and handled
-with a labelled local fallback, or a 502 if no valid fallback can be produced;
-timeouts return 504. Never persist a partial invalid card.
-
-`PUT /api/tasks/{task_id}` -> 200
-```json
-{
-  "revision":4,
-  "topic":"retail",
-  "card":{
-    "title":"Service comparison tool",
-    "context":"Customers ask staff to explain service differences.",
-    "need":"Let customers compare services before contacting staff.",
-    "users":"Retail customers",
-    "data":"An anonymized service catalog with names and prices",
-    "constraints":"Web prototype in one week; no customer personal data",
-    "expected_result":"A working comparison prototype",
-    "success_criteria":"Five test users can compare three services without help",
-    "contact":"demo-business@example.com",
-    "interaction_format":"Weekly video review and written feedback within two days"
-  }
-}
-```
-All 10 card keys are required strings; empty strings are valid unknown values.
-Title maximum 200 characters; other fields maximum 10000.
-Returns task wrapper including rating_preview. No additional recalculate
-request is necessary after a save.
-
-### Rating and publishing
-
-`GET /api/tasks/{task_id}/rating` -> 200
-```json
-{
-  "task_id":"UUID",
-  "revision":5,
-  "confirmed_revision":null,
-  "rating":{
-    "score":0,"level":"draft",
-    "breakdown":[
-      {"key":"context_need","earned":0,"max":20},
-      {"key":"data","earned":0,"max":20},
-      {"key":"expected_result","earned":0,"max":15},
-      {"key":"success_criteria","earned":0,"max":15},
-      {"key":"constraints","earned":0,"max":10},
-      {"key":"users","earned":0,"max":10},
-      {"key":"business_connection","earned":0,"max":10}
-    ],
-    "missing_fields":["title","context","need","users","data","constraints","expected_result","success_criteria","contact","interaction_format"]
-  },
-  "rating_preview":{
-    "score":100,"level":"priority",
-    "breakdown":[
-      {"key":"context_need","earned":20,"max":20},
-      {"key":"data","earned":20,"max":20},
-      {"key":"expected_result","earned":15,"max":15},
-      {"key":"success_criteria","earned":15,"max":15},
-      {"key":"constraints","earned":10,"max":10},
-      {"key":"users","earned":10,"max":10},
-      {"key":"business_connection","earned":10,"max":10}
-    ],
-    "missing_fields":[]
-  }
-}
-```
-Deterministic MVP scoring: context 10 + need 10; data 20; expected_result 15;
-success_criteria 15; constraints 10; users 10; contact 5 + interaction_format 5.
-Each field earns its points when trimmed content is nonempty and confirmed.
-This is a transparent completeness rubric, not a claim that arbitrary filled
-text is high quality. Human confirmation is required for official points.
-Title is required to confirm/publish but earns no points.
-Missing fields belong to the corresponding official or preview card.
-
-Bands: 0-39 draft, 40-69 workable, 70-89 ready, 90-100 priority.
-
-`POST /api/tasks/{task_id}/confirm` -> 200
-```json
-{"revision":5}
-```
-Requires a nonempty title; other fields may remain unknown. Returns task
-wrapper with confirmed_revision equal to revision and updated official rating.
-
-`POST /api/tasks/{task_id}/publish` -> 200
-```json
-{"revision":5}
-```
-Requires confirmation of the current revision; otherwise 409. Returns task.
-
-### Teams and proposals
-
-`GET /api/teams` -> 200 list of the five demo teams:
-`{"id":"UUID","name":"Team Alpha","interests":["retail"],"skills":["backend"],
-"technologies":["Go","PostgreSQL"],"points":0,"created_at":"2026-09-23T08:00:00Z"}`.
-Same list envelope/pagination defaults. `POST /api/teams` accepts `{"name":"..."}`
-and creates a zero-point profile. `GET /api/teams/{team_id}` returns `{"team":{...}}`
-including its current points.
-
-`POST /api/tasks/{task_id}/proposals` -> 201
-```json
-{
-  "team_id":"UUID",
-  "solution_idea":"A searchable comparison table for the service catalog",
-  "plan":"Import sample services, build comparison view, test with five users",
-  "timeline":"One week",
-  "prototype_link":"https://example.com/prototype"
-}
-```
-Task must be published (409 otherwise); team must exist (404 otherwise).
-solution_idea and plan: 1-10000 trimmed characters; timeline: 1-500.
-prototype_link: empty string or absolute HTTP(S) URL, maximum 2048 characters.
-A prototype is optional at first submission, but seeded examples include links.
-Unlimited proposals, including multiple proposals from the same team; disable
-the submit button while a request is pending to reduce accidental duplicates.
-
-Proposal shape:
-```json
-{
-  "proposal":{
-    "id":"UUID","task_id":"UUID","team_id":"UUID","team_name":"Team Alpha",
-    "solution_idea":"A comparison table","plan":"Build and test a prototype",
-    "timeline":"One week","prototype_link":"https://example.com/prototype",
-    "status":"submitted","created_at":"2026-09-23T08:00:00Z","decided_at":null
-  }
-}
-```
-
-`GET /api/tasks/{task_id}/proposals` -> 200 list of proposal objects.
-Optional status filter: submitted/accepted/rejected. Default all; newest first.
-
-`POST /api/proposals/{proposal_id}/accept` -> 200 proposal wrapper.
-`POST /api/proposals/{proposal_id}/reject` -> 200 proposal wrapper.
-No request body. Only human actions call these endpoints. Each affects just
-that proposal; accepting does not reject others or close the task. Repeating a
-decision is harmless; switching accepted/rejected is allowed to correct a
-mistake. Pending/no selection requires no action. No automatic team ranking.
-
-The first acceptance awards +10 to the team, once per offer. Status, award,
-team points, and task `work_status` are committed in one transaction. Repeated
-or concurrent acceptance does not award again. Changing accepted to rejected
-retains the first-acceptance award; accepting again adds nothing. A task with
-any accepted offer has `work_status=in_progress`, otherwise `open`; its
-publication status stays `published` and new offers remain allowed.
-
-## Errors
+`answers` replaces the answer list when supplied (max 50):
 
 ```json
-{
-  "error":{
-    "code":"validation_error",
-    "message":"Some fields are invalid.",
-    "fields":{"raw_description":"Required"}
-  }
-}
+[{"id":"answer-1","questionId":"q1","text":"Sales are available as CSV."}]
 ```
-400 malformed JSON/query; 401 missing/invalid demo actor; 403 wrong role/owner;
-404 unknown ID/resource or unpublished public task;
-409 invalid lifecycle or stale revision; 422 valid JSON with invalid field
-values; 502 invalid upstream AI response; 504 AI timeout; 500 unexpected error.
-fields may be omitted outside validation. Do not return database errors or keys.
-Health keeps its existing separate JSON shape and uses 503 when DB is down.
 
-## Postman and frontend handoff
+Answer IDs must be unique and cannot be `draft`. Empty answer text means skipped.
+Omitted title/industry/answers stay unchanged. `fields` patches only supplied keys;
+use `value:null` to clear a field. Each field is:
 
-Open `backend/docs` in Postman's Local View. The **Hackathon API** collection
-under `postman/collections` contains 18 core requests. See
-[the Postman setup guide](postman/README.md) for opening and sending them.
-The collection uses Postman v3 YAML and is registered in
-`.postman/resources.yaml`; no JSON import or separate environment is needed.
-`base_url` defaults to `http://localhost:8080`.
-The numbered folder order is the demo execution order.
+```json
+{"value":"CSV","confirmed":false,"source":{"id":"answer-1","quote":"CSV"}}
+```
 
-Collection variables task_id, revision, question_1_id through question_3_id,
-team_id and proposal_id are captured from responses. List teams also captures
-second_team_id for manually testing proposals from another team.
-Run the numbered happy-path folders in order after domain routes are built.
-Question demo answers are generic test fixtures; edit them to match the AI's
-actual questions when showing a realistic demo. The manually edited example
-card is synthetic, human-provided data, not an AI claim.
+Manual fields use `source:null`. Client-supplied confirmation is never trusted.
+AI suggestions are `{field,value,sourceId}`: map them to fields with
+`source:{id:sourceId,quote:value}`, show them for review, then save through PUT.
+AI never writes the database or confirms facts. A provided source must contain
+the field value after whitespace normalization. Changing a sourced answer removes
+stale source confirmation; editing successMetric resets target/method confirmation.
 
-Each endpoint has status assertions; captured IDs are asserted before storage.
-Rating checks validate weights, sums and boundaries. The demo verifies an empty
-draft at 0 and a confirmed completed card at 100, catalog rating order and
-proposal submission. Accept and reject target the same captured proposal;
-choose one, or run both to test changing its decision. For separate decisions,
-submit another proposal and decide on the newly captured proposal_id.
-Additional manual cases: publish a title-only card and submit a proposal;
-accept proposals from multiple teams; submit an empty draft; and try publishing
-without confirmation. These are not separate automated collection requests.
-Rerunning creates fresh tasks and proposals; it does not clean up existing data.
+Field keys: `context`, `need`, `dataSource`, `dataFormat`, `dataAccess`, `deliverable`,
+`deliveryFormat`, `successMetric`, `successTarget`, `acceptanceMethod`, `deadline`,
+`constraints`, `users`, `usageScenario`, `contact`, `feedbackFormat`.
 
-Health, teams and proposal review/submission can run against this implementation.
-Before block 1 is available, insert the published task fixture in `block2.md`
-and set `task_id` and `business_id` in Postman. The full builder/catalog flow
-still requires block 1. Health is 200 when connected or 503 if DB is unavailable.
+Task returns `workingFields`, `answers`, `draft`, `revision`, `confirmedRevision`,
+`confirmedSnapshot`, `preview`, `status`, `workStatus`, and timestamps.
+`preview` and the snapshot include `total`, `readiness`, seven `scoreBreakdown`
+groups, `missingFields`, and `nextActions` with `possibleGain`.
+Confirm accepts an empty `fieldKeys:[]` for an explicitly reviewed empty card.
+Unconfirmed values never appear in the public snapshot. Draft edits leave the
+last public snapshot unchanged; confirming a published task updates it atomically.
 
-Five teams are seeded; seeded drafts/cards/proposals remain a separate milestone.
-List pages must support empty/loading/error states before seeding.
+AI returns `questions`, `fieldSuggestions`, `warnings`, `mode`, `durationMs`.
+Display fallback clearly and keep manual editing available. `clarify` returns
+3-5 questions. Sources are untrusted data; the server checks source attribution.
 
-Suggested demo: create weak draft -> get questions -> answer -> generate card ->
-manually improve card -> observe preview -> confirm -> publish -> browse catalog
--> team submits proposal -> business accepts one proposal and rejects another.
+## 2. Catalog: /catalog
+
+| Request | Purpose |
+| --- | --- |
+| `GET /tasks?industry=retail&readiness=priority&limit=20&offset=0` | Published cards, optional filters |
+
+Default order: score descending, first publication time ascending, UUID ascending.
+Readiness: `draft` 0-39, `working` 40-69, `ready` 70-89, `priority` 90-100.
+Here `draft` is a readiness band, not publication status. Published zero-score
+cards remain visible and accept proposals. Remove query filters to reset them.
+Public items contain `id,title,industry,fields,total,readiness,scoreBreakdown,
+missingFields,nextActions,timestamp,publishedAt,workStatus`, not private answers.
+
+## 3. Task Details: /tasks/:id
+
+| Request | Purpose |
+| --- | --- |
+| `GET /tasks/:id` | Public card; omit business-owner header when requesting the public view |
+| `GET /teams` | Seed profiles for the demo role picker |
+| `POST /tasks/:id/proposals` | Team submits `{idea,plan:["step"],durationDays:7,prototypeUrl:"https://example.org"}` |
+| `GET /tasks/:id/proposals` | Team sees only its own; owner sees all |
+| `POST /proposals/:id/milestone` | Accepted team submits `{resultText,evidenceUrl:"https://example.org/result"}` |
+
+Idea max 10000 characters; plan 1-30 nonempty steps, 10000 joined characters;
+durationDays is an integer 1-3650. Prototype URL is optional (empty string allowed).
+Milestone result max 10000 characters, evidence URL required. URLs must be absolute
+HTTP(S), without credentials. The server never fetches submitted links.
+Milestone submission returns 200, including an identical retry; different content
+for an existing milestone returns 409. One milestone per accepted proposal.
+
+Proposal fields: `id,taskId,teamId,teamName,idea,plan,durationDays,prototypeUrl,
+status,createdAt,decidedAt,milestone`. Status: pending/accepted/rejected.
+List responses include the milestone and awarded points, or `milestone:null`.
+Legacy stored offers can have `durationDays:null`; their original timeline remains
+available via the compatibility `/offers` API.
+
+## 4. Business Workspace: /business/tasks/:id
+
+| Request | Purpose |
+| --- | --- |
+| `GET /business/tasks` | Current owner's drafts and published tasks |
+| `GET /tasks/:id` | Private working card and confirmed snapshot |
+| `GET /tasks/:id/proposals?status=pending` | Review proposals; optional status and pagination |
+| `POST /proposals/:id/decision` | `{decision:"accepted"}` or `{decision:"rejected"}` |
+| `POST /milestones/:id/confirm` | `{confirmed:true}` verifies result and grants 10 once |
+| `GET /teams/:id` | Profile and total verified-progress points |
+
+Several proposals may be accepted, or all rejected. Other pending proposals do
+not change automatically. Repeating the same decision is safe; reversing a final
+decision returns 409. Accepting a proposal awards **no points**. Confirmation of
+its milestone grants exactly 10, including concurrent retries. Points derive from
+the unique milestone award records, not the old acceptance-award table.
+
+## Operational and compatibility routes
+
+`GET /health` (under `/api`) checks DB connectivity and reports configured AI mode.
+The root `/health` is an alias. It does not make a paid AI request.
+`POST /teams` with `{name}` remains available for local demo profiles.
+
+Old `/tasks/:id/offers` GET/POST, `PATCH /offers/:id/status` and
+`POST /proposals/:id/accept|reject` remain compatibility routes. Legacy create uses
+`solution_idea,plan` (string), `timeline,prototype_link,team_id?`; optional team_id
+must equal the selected actor. Single legacy responses retain `offer`/`proposal`
+wrappers; list responses use the standard data envelope. Final-decision and
+milestone-only points rules apply to every route. New frontend code should use
+the primary routes above.
+
+HTTP codes: 400 invalid JSON/query, 401 missing/invalid demo actor, 403 forbidden,
+404 unavailable/missing resource, 409 stale revision/state conflict, 422 invalid
+fields, 500 internal failure, 503 DB unavailable or demo mode disabled.

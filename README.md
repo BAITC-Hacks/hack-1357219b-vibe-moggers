@@ -41,7 +41,8 @@ npm run build
 | [Данные для разработки](docs/fixtures/seed.json) | 5 черновиков, 5 карточек, 5 команд и 5 откликов; всё синтетическое |
 
 Команда: один frontend-разработчик Vue и два backend-разработчика Go.
-Предлагаемый стек: Vue 3 + TypeScript + Vite, Go, SQLite, один внешний AI API.
+Стек: Vue 3 + TypeScript + Vite, Go `net/http` + `database/sql`, PostgreSQL,
+pgAdmin, OpenAI Responses API с явным fallback. SQLite больше не используется.
 
 Настоящая аутентификация не входит в эту версию: переключатель участника — демо-режим.
 Баллы в локальном демо считаются в браузере, в API-режиме публичная оценка берётся

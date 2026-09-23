@@ -1,22 +1,15 @@
 $kind: collection
 description: |
-  Hackathon API - Go backend at http://localhost:8080.
-  Run folders 01-04 in order once the planned routes are implemented.
-  In folder 05, accept or reject the captured proposal. Running both changes
-  the same proposal from accepted to rejected.
-  Health, teams, proposals and decisions are implemented. Task builder and
-  catalog routes remain pending. See backend/docs/block2.md for a task fixture.
-  business_id must match the task owner; team_id selects the demo team.
-  IDs and revision values are captured by the response scripts.
+  Qadam backend: PostgreSQL, Task Builder, AI, catalog, proposals and verified progress.
+  Run folders 01-07 in order. IDs and revisions are captured automatically.
+  API keys belong only in the Go server's ignored .env file.
 variables:
-  base_url: "http://localhost:8080"
+  base_url: "http://127.0.0.1:8080"
   task_id: ""
   revision: "0"
-  question_1_id: ""
-  question_2_id: ""
-  question_3_id: ""
-  team_id: ""
   business_id: "10000000-0000-4000-8000-000000000001"
+  team_id: "00000000-0000-4000-8000-000000000001"
+  second_team_id: "00000000-0000-4000-8000-000000000002"
   proposal_id: ""
   rejected_proposal_id: ""
-  second_team_id: ""
+  milestone_id: ""
