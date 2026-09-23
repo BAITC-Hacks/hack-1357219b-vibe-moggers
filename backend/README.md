@@ -2,6 +2,14 @@
 
 Go API backed by PostgreSQL.
 
+## Frontend API contract
+
+See [the page-by-page request list](docs/api-request-list.md) for the five MVP
+screens, request/response shapes, rating rules and demo flow. Open
+[the Postman v3 collection](docs/postman/README.md) in Postman's Local View to
+exercise the agreed routes as they are implemented. Only `GET /health` is implemented
+today; all `/api/*` requests are planned and currently return 404.
+
 ## Local setup
 
 Requirements: Go 1.23+ and Docker Desktop.

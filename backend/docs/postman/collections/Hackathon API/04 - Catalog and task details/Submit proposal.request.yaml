@@ -1,0 +1,29 @@
+$kind: http-request
+description: "Planned; returns 404 until implemented. Submit proposal. See backend/docs/api-request-list.md for the contract."
+url: "{{base_url}}/api/tasks/{{task_id}}/proposals"
+method: POST
+headers:
+  "Accept": "application/json"
+  "Content-Type": "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "team_id": "{{team_id}}",
+      "solution_idea": "A searchable comparison table for the service catalog",
+      "plan": "Import services, build comparison view, test with five users",
+      "timeline": "One week",
+      "prototype_link": "https://example.com/prototype"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('HTTP 201', () => pm.response.to.have.status(201));
+      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      if (pm.response.code === 201) {
+      const proposal = pm.response.json().proposal;
+      pm.test('Proposal belongs to selected task and team', () => { pm.expect(proposal.id).to.be.a('string').and.not.empty; pm.expect(proposal.task_id).to.eql(pm.collectionVariables.get('task_id')); pm.expect(proposal.team_id).to.eql(pm.collectionVariables.get('team_id')); pm.expect(proposal.status).to.eql('submitted'); });
+      if (proposal && proposal.id) pm.collectionVariables.set('proposal_id', proposal.id);
+      }
+order: 3000

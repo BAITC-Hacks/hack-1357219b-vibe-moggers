@@ -1,0 +1,35 @@
+$kind: http-request
+description: "Planned; returns 404 until implemented. Confirm card. See backend/docs/api-request-list.md for the contract."
+url: "{{base_url}}/api/tasks/{{task_id}}/confirm"
+method: POST
+headers:
+  "Accept": "application/json"
+  "Content-Type": "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "revision": {{revision}}
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('HTTP 200', () => pm.response.to.have.status(200));
+      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      if (pm.response.code === 200) {
+      const task = pm.response.json().task;
+      pm.test('Task has an ID and revision', () => { pm.expect(task.id).to.be.a('string').and.not.empty; pm.expect(task.revision).to.be.a('number'); });
+      if (task && task.id && Number.isInteger(task.revision)) { pm.collectionVariables.set('task_id', task.id); pm.collectionVariables.set('revision', task.revision); }
+      function checkRating(r) {
+        pm.expect(r.score).to.be.within(0, 100);
+        const weights = { context_need:20, data:20, expected_result:15, success_criteria:15, constraints:10, users:10, business_connection:10 };
+        pm.expect(r.breakdown.map(b => b.key).sort()).to.eql(Object.keys(weights).sort());
+        r.breakdown.forEach(b => { pm.expect(b.max).to.eql(weights[b.key]); pm.expect(b.earned).to.be.within(0, b.max); });
+        pm.expect(r.breakdown.reduce((n,b) => n+b.earned,0)).to.eql(r.score);
+        pm.expect(r.level).to.eql(r.score < 40 ? 'draft' : r.score < 70 ? 'workable' : r.score < 90 ? 'ready' : 'priority');
+        pm.expect(r.missing_fields).to.be.an('array');
+      }
+      pm.test('Official score is confirmed at 100', () => { checkRating(task.rating); pm.expect(task.rating.score).to.eql(100); pm.expect(task.confirmed_revision).to.eql(task.revision); pm.expect(task.status).to.eql('confirmed'); });
+      }
+order: 8000

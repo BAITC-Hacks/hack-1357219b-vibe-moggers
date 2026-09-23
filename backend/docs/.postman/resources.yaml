@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: c16e1897-9137-4424-934e-62ef48226d0f
+
+localResources:
+  collections:
+    - ../postman/collections/Hackathon API

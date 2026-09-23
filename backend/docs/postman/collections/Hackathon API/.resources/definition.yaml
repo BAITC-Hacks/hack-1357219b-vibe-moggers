@@ -1,0 +1,19 @@
+$kind: collection
+description: |
+  Hackathon API - Go backend at http://localhost:8080.
+  Run folders 01-04 in order once the planned routes are implemented.
+  In folder 05, accept or reject the captured proposal. Running both changes
+  the same proposal from accepted to rejected.
+  Only GET /health is implemented today. Other routes currently return 404.
+  IDs and revision values are captured by the response scripts.
+variables:
+  base_url: "http://localhost:8080"
+  task_id: ""
+  revision: "0"
+  question_1_id: ""
+  question_2_id: ""
+  question_3_id: ""
+  team_id: ""
+  proposal_id: ""
+  rejected_proposal_id: ""
+  second_team_id: ""

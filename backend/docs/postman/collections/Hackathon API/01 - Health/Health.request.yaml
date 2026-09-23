@@ -1,0 +1,16 @@
+$kind: http-request
+description: "Implemented. Health. See backend/docs/api-request-list.md for the contract."
+url: "{{base_url}}/health"
+method: GET
+headers:
+  "Accept": "application/json"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('HTTP 200', () => pm.response.to.have.status(200));
+      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      if (pm.response.code === 200) {
+      pm.test('Database connected', () => pm.expect(pm.response.json()).to.eql({database:'connected',status:'ok'}));
+      }
+order: 1000
