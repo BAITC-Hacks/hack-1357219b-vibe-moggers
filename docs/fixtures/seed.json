@@ -1,0 +1,673 @@
+{
+  "_meta": {
+    "schemaVersion": 1,
+    "synthetic": true,
+    "purpose": "Development fixtures; not a running database or real customer evidence.",
+    "links": "example.org contacts and prototype links are placeholders.",
+    "import": "Recompute scores from confirmed fields; expectedScore is an assertion, never trusted user input."
+  },
+  "scoreWeights": {
+    "context": 10,
+    "need": 10,
+    "dataSource": 10,
+    "dataFormat": 5,
+    "dataAccess": 5,
+    "deliverable": 10,
+    "deliveryFormat": 5,
+    "successMetric": 5,
+    "successTarget": 5,
+    "acceptanceMethod": 5,
+    "deadline": 5,
+    "constraints": 5,
+    "users": 5,
+    "usageScenario": 5,
+    "contact": 5,
+    "feedbackFormat": 5
+  },
+  "drafts": [
+    {
+      "id": "draft-1",
+      "text": "У нас небольшой магазин. Хотим ИИ, чтобы лучше управлять остатками.",
+      "industry": "retail",
+      "completeness": "low"
+    },
+    {
+      "id": "draft-2",
+      "text": "Координатор хочет помочь студентам искать учебные проекты. Пользователи — студенты. Нужен веб-прототип за 10 дней; доступность описаний ещё уточняется.",
+      "industry": "education",
+      "completeness": "medium"
+    },
+    {
+      "id": "draft-3",
+      "text": "Мастерская ведёт обращения в разных таблицах. Нужен единый список с фильтрами для администратора за 7 дней. Без интеграции с телефонией. Контакт service-demo@example.org.",
+      "industry": "services",
+      "completeness": "medium"
+    },
+    {
+      "id": "draft-4",
+      "text": "Диспетчер учебной доставки каждый день разбирает задержки. Хотим систематизировать причины. Данные и метрики пока не определены.",
+      "industry": "logistics",
+      "completeness": "low"
+    },
+    {
+      "id": "draft-5",
+      "text": "В кооперативе заявки поступают сообщениями. Координатору нужен общий список. Есть синтетическая таблица: дата, категория, объём. Передадим CSV выбранной команде. Нужна веб-форма за 14 дней. Успех — 10 из 10 контрольных заявок попали в список; координатор проверяет это вручную. Контакт agro-demo@example.org, созвон раз в неделю.",
+      "industry": "agriculture",
+      "completeness": "high"
+    }
+  ],
+  "cards": [
+    {
+      "id": "seed-task-1",
+      "ownerId": "demo-business-1",
+      "title": "Список закупок для учебного магазина",
+      "industry": "retail",
+      "fields": {
+        "context": {
+          "value": "Закупки планируются вручную по таблице остатков.",
+          "confirmed": true,
+          "source": null
+        },
+        "need": {
+          "value": "Подготовить список товаров для следующей закупки.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataSource": {
+          "value": "Есть синтетические продажи и остатки по 30 товарам.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataFormat": {
+          "value": "CSV: date, sku, sales, stock.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataAccess": {
+          "value": "Тестовый CSV передаётся выбранной команде.",
+          "confirmed": true,
+          "source": null
+        },
+        "deliverable": {
+          "value": "Веб-прототип списка закупок.",
+          "confirmed": true,
+          "source": null
+        },
+        "deliveryFormat": {
+          "value": "Веб-страница с импортом CSV.",
+          "confirmed": true,
+          "source": null
+        },
+        "successMetric": {
+          "value": "Время подготовки списка по 30 товарам.",
+          "confirmed": true,
+          "source": null
+        },
+        "successTarget": {
+          "value": "Не более 10 минут на один список.",
+          "confirmed": true,
+          "source": null
+        },
+        "acceptanceMethod": {
+          "value": "Управляющий выполняет 3 сценария с замером времени.",
+          "confirmed": true,
+          "source": null
+        },
+        "deadline": {
+          "value": "14 календарных дней после выбора команды.",
+          "confirmed": true,
+          "source": null
+        },
+        "constraints": {
+          "value": "Без интеграции с кассой; только синтетические данные.",
+          "confirmed": true,
+          "source": null
+        },
+        "users": {
+          "value": "Управляющий магазина.",
+          "confirmed": true,
+          "source": null
+        },
+        "usageScenario": {
+          "value": "Утренняя подготовка закупки перед звонком поставщику.",
+          "confirmed": true,
+          "source": null
+        },
+        "contact": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "feedbackFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        }
+      },
+      "expectedScore": 90,
+      "expectedReadiness": "priority",
+      "publishedAt": "2026-09-23T08:00:00Z"
+    },
+    {
+      "id": "seed-task-2",
+      "ownerId": "demo-business-1",
+      "title": "Навигатор учебных проектов",
+      "industry": "education",
+      "fields": {
+        "context": {
+          "value": "Координатор вручную отвечает на повторяющиеся вопросы о проектах.",
+          "confirmed": true,
+          "source": null
+        },
+        "need": {
+          "value": "Помочь студентам находить описание подходящего проекта.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataSource": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataAccess": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deliverable": {
+          "value": "Поисковый веб-прототип по описаниям проектов.",
+          "confirmed": true,
+          "source": null
+        },
+        "deliveryFormat": {
+          "value": "Список результатов со ссылками на исходные описания.",
+          "confirmed": true,
+          "source": null
+        },
+        "successMetric": {
+          "value": "Доля контрольных вопросов с найденным верным проектом.",
+          "confirmed": true,
+          "source": null
+        },
+        "successTarget": {
+          "value": "Не менее 8 из 10 контрольных вопросов.",
+          "confirmed": true,
+          "source": null
+        },
+        "acceptanceMethod": {
+          "value": "Координатор проверяет 10 заранее согласованных вопросов.",
+          "confirmed": true,
+          "source": null
+        },
+        "deadline": {
+          "value": "10 календарных дней после выбора команды.",
+          "confirmed": true,
+          "source": null
+        },
+        "constraints": {
+          "value": "Ответы должны содержать ссылки на предоставленные описания.",
+          "confirmed": true,
+          "source": null
+        },
+        "users": {
+          "value": "Студенты, выбирающие практический проект.",
+          "confirmed": true,
+          "source": null
+        },
+        "usageScenario": {
+          "value": "Выбор проекта перед встречей с координатором.",
+          "confirmed": true,
+          "source": null
+        },
+        "contact": {
+          "value": "education-demo@example.org",
+          "confirmed": true,
+          "source": null
+        },
+        "feedbackFormat": {
+          "value": "Созвон с координатором два раза в неделю.",
+          "confirmed": true,
+          "source": null
+        }
+      },
+      "expectedScore": 80,
+      "expectedReadiness": "ready",
+      "publishedAt": "2026-09-23T08:00:00Z"
+    },
+    {
+      "id": "seed-task-3",
+      "ownerId": "demo-business-1",
+      "title": "Таблица заявок сервисной мастерской",
+      "industry": "services",
+      "fields": {
+        "context": {
+          "value": "Мастерская записывает обращения в нескольких таблицах.",
+          "confirmed": true,
+          "source": null
+        },
+        "need": {
+          "value": "Собрать обращения в единый список с состояниями.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataSource": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataAccess": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deliverable": {
+          "value": "Веб-прототип единой таблицы обращений.",
+          "confirmed": true,
+          "source": null
+        },
+        "deliveryFormat": {
+          "value": "Страница со списком и фильтрами состояния.",
+          "confirmed": true,
+          "source": null
+        },
+        "successMetric": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "successTarget": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "acceptanceMethod": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deadline": {
+          "value": "7 календарных дней после выбора команды.",
+          "confirmed": true,
+          "source": null
+        },
+        "constraints": {
+          "value": "В первом прототипе нет интеграции с телефонией.",
+          "confirmed": true,
+          "source": null
+        },
+        "users": {
+          "value": "Администратор мастерской.",
+          "confirmed": true,
+          "source": null
+        },
+        "usageScenario": {
+          "value": "Просмотр незавершённых обращений в начале рабочего дня.",
+          "confirmed": true,
+          "source": null
+        },
+        "contact": {
+          "value": "service-demo@example.org",
+          "confirmed": true,
+          "source": null
+        },
+        "feedbackFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        }
+      },
+      "expectedScore": 60,
+      "expectedReadiness": "working",
+      "publishedAt": "2026-09-23T08:00:00Z"
+    },
+    {
+      "id": "seed-task-4",
+      "ownerId": "demo-business-1",
+      "title": "Разбор задержек доставки",
+      "industry": "logistics",
+      "fields": {
+        "context": {
+          "value": "Диспетчер вручную разбирает причины задержек доставки.",
+          "confirmed": true,
+          "source": null
+        },
+        "need": {
+          "value": "Систематизировать причины задержек.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataSource": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataAccess": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deliverable": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deliveryFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "successMetric": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "successTarget": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "acceptanceMethod": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deadline": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "constraints": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "users": {
+          "value": "Диспетчер учебной службы доставки.",
+          "confirmed": true,
+          "source": null
+        },
+        "usageScenario": {
+          "value": "Ежедневный разбор вчерашних задержек.",
+          "confirmed": true,
+          "source": null
+        },
+        "contact": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "feedbackFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        }
+      },
+      "expectedScore": 30,
+      "expectedReadiness": "draft",
+      "publishedAt": "2026-09-23T08:00:00Z"
+    },
+    {
+      "id": "seed-task-5",
+      "ownerId": "demo-business-1",
+      "title": "Учёт заявок фермерского кооператива",
+      "industry": "agriculture",
+      "fields": {
+        "context": {
+          "value": "Заявки участников кооператива поступают в разрозненных сообщениях.",
+          "confirmed": true,
+          "source": null
+        },
+        "need": {
+          "value": "Собрать заявки в общий перечень для координатора.",
+          "confirmed": true,
+          "source": null
+        },
+        "dataSource": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "dataAccess": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deliverable": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deliveryFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "successMetric": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "successTarget": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "acceptanceMethod": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "deadline": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "constraints": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "users": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "usageScenario": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "contact": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        },
+        "feedbackFormat": {
+          "value": null,
+          "confirmed": false,
+          "source": null
+        }
+      },
+      "expectedScore": 20,
+      "expectedReadiness": "draft",
+      "publishedAt": "2026-09-23T08:00:00Z"
+    }
+  ],
+  "teams": [
+    {
+      "id": "team-1",
+      "name": "Vibe Moggers",
+      "interests": [
+        "retail",
+        "education"
+      ],
+      "skills": [
+        "web development",
+        "API design"
+      ],
+      "technologies": [
+        "Vue",
+        "Go"
+      ]
+    },
+    {
+      "id": "team-2",
+      "name": "Steppe Flow",
+      "interests": [
+        "retail",
+        "logistics"
+      ],
+      "skills": [
+        "data visualization",
+        "backend"
+      ],
+      "technologies": [
+        "Go",
+        "SQL"
+      ]
+    },
+    {
+      "id": "team-3",
+      "name": "Campus Builders",
+      "interests": [
+        "education",
+        "services"
+      ],
+      "skills": [
+        "UX",
+        "frontend"
+      ],
+      "technologies": [
+        "Vue",
+        "TypeScript"
+      ]
+    },
+    {
+      "id": "team-4",
+      "name": "Route Lab",
+      "interests": [
+        "logistics"
+      ],
+      "skills": [
+        "data analysis",
+        "API design"
+      ],
+      "technologies": [
+        "Go",
+        "SQL"
+      ]
+    },
+    {
+      "id": "team-5",
+      "name": "Agro Makers",
+      "interests": [
+        "agriculture"
+      ],
+      "skills": [
+        "forms",
+        "workflow design"
+      ],
+      "technologies": [
+        "Vue",
+        "Go"
+      ]
+    }
+  ],
+  "proposals": [
+    {
+      "id": "proposal-1",
+      "taskId": "seed-task-1",
+      "teamId": "team-1",
+      "idea": "Список закупок по явным правилам.",
+      "plan": [
+        "Проверить CSV",
+        "Сделать таблицу рекомендаций",
+        "Провести контрольные сценарии"
+      ],
+      "durationDays": 14,
+      "prototypeUrl": "https://example.org/prototypes/proposal-1",
+      "status": "pending",
+      "createdAt": "2026-09-23T08:05:00Z"
+    },
+    {
+      "id": "proposal-2",
+      "taskId": "seed-task-1",
+      "teamId": "team-2",
+      "idea": "Панель остатков с ручным планом закупок.",
+      "plan": [
+        "Согласовать столбцы",
+        "Собрать прототип",
+        "Проверить с управляющим"
+      ],
+      "durationDays": 10,
+      "prototypeUrl": "https://example.org/prototypes/proposal-2",
+      "status": "pending",
+      "createdAt": "2026-09-23T08:05:00Z"
+    },
+    {
+      "id": "proposal-3",
+      "taskId": "seed-task-2",
+      "teamId": "team-3",
+      "idea": "Поиск проектов по запросу студента.",
+      "plan": [
+        "Уточнить доступные описания",
+        "Собрать поиск",
+        "Проверить контрольные вопросы"
+      ],
+      "durationDays": 10,
+      "prototypeUrl": "https://example.org/prototypes/proposal-3",
+      "status": "pending",
+      "createdAt": "2026-09-23T08:05:00Z"
+    },
+    {
+      "id": "proposal-4",
+      "taskId": "seed-task-4",
+      "teamId": "team-4",
+      "idea": "Сначала уточнить сведения, затем собрать таблицу задержек.",
+      "plan": [
+        "Согласовать данные",
+        "Собрать категории причин",
+        "Подготовить прототип"
+      ],
+      "durationDays": 7,
+      "prototypeUrl": "https://example.org/prototypes/proposal-4",
+      "status": "pending",
+      "createdAt": "2026-09-23T08:05:00Z"
+    },
+    {
+      "id": "proposal-5",
+      "taskId": "seed-task-5",
+      "teamId": "team-5",
+      "idea": "Единая форма заявок и таблица координатора.",
+      "plan": [
+        "Уточнить поля заявки",
+        "Сделать форму",
+        "Согласовать приёмку"
+      ],
+      "durationDays": 7,
+      "prototypeUrl": "https://example.org/prototypes/proposal-5",
+      "status": "pending",
+      "createdAt": "2026-09-23T08:05:00Z"
+    }
+  ]
+}
