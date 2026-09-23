@@ -1,10 +1,11 @@
 $kind: http-request
-description: "Planned; returns 404 until implemented. Submit proposal. See backend/docs/api-request-list.md for the contract."
+description: "Submit an offer from the selected demo team. Task must already be published. Implemented."
 url: "{{base_url}}/api/tasks/{{task_id}}/proposals"
 method: POST
 headers:
   "Accept": "application/json"
   "Content-Type": "application/json"
+  "X-Demo-Actor": "team:{{team_id}}"
 body:
   type: json
   content: |-

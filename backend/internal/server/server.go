@@ -17,11 +17,15 @@ type Server struct {
 	logger *slog.Logger
 }
 
-func New(db databasePinger, logger *slog.Logger) http.Handler {
+func New(db databasePinger, logger *slog.Logger, register ...func(*http.ServeMux)) http.Handler {
 	server := &Server{db: db, logger: logger}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", server.health)
+	mux.HandleFunc("GET /api/health", server.health)
+	for _, routes := range register {
+		routes(mux)
+	}
 
 	return mux
 }

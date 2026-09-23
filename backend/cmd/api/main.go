@@ -12,7 +12,10 @@ import (
 
 	"vibe-moggers/backend/internal/config"
 	"vibe-moggers/backend/internal/database"
+	"vibe-moggers/backend/internal/offers"
 	"vibe-moggers/backend/internal/server"
+	"vibe-moggers/backend/internal/tasks"
+	"vibe-moggers/backend/internal/teams"
 )
 
 func main() {
@@ -31,9 +34,19 @@ func main() {
 	}
 	defer db.Close()
 
+	migrationCtx, cancelMigrations := context.WithTimeout(context.Background(), 30*time.Second)
+	err = database.Migrate(migrationCtx, db)
+	cancelMigrations()
+	if err != nil {
+		logger.Error("failed to migrate database", "error", err)
+		os.Exit(1)
+	}
+	teamHandler := teams.NewHandler(db, logger)
+	offerHandler := offers.NewHandler(offers.NewStore(db, tasks.SQLAccess{}), logger)
+
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           server.New(db, logger),
+		Handler:           server.New(db, logger, teamHandler.Register, offerHandler.Register),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

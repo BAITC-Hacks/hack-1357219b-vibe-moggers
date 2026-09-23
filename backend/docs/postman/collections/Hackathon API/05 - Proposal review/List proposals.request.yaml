@@ -1,9 +1,10 @@
 $kind: http-request
-description: "Planned; returns 404 until implemented. List proposals. See backend/docs/api-request-list.md for the contract."
+description: "List offers as the task owner. Set business_id to tasks.owner_id. Implemented."
 url: "{{base_url}}/api/tasks/{{task_id}}/proposals?limit=20&offset=0"
 method: GET
 headers:
   "Accept": "application/json"
+  "X-Demo-Actor": "business:{{business_id}}"
 scripts:
   - type: afterResponse
     language: text/javascript

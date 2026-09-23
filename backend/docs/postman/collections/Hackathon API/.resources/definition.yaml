@@ -4,7 +4,9 @@ description: |
   Run folders 01-04 in order once the planned routes are implemented.
   In folder 05, accept or reject the captured proposal. Running both changes
   the same proposal from accepted to rejected.
-  Only GET /health is implemented today. Other routes currently return 404.
+  Health, teams, proposals and decisions are implemented. Task builder and
+  catalog routes remain pending. See backend/docs/block2.md for a task fixture.
+  business_id must match the task owner; team_id selects the demo team.
   IDs and revision values are captured by the response scripts.
 variables:
   base_url: "http://localhost:8080"
@@ -14,6 +16,7 @@ variables:
   question_2_id: ""
   question_3_id: ""
   team_id: ""
+  business_id: "10000000-0000-4000-8000-000000000001"
   proposal_id: ""
   rejected_proposal_id: ""
   second_team_id: ""

@@ -1,9 +1,10 @@
 $kind: http-request
-description: "Planned; returns 404 until implemented. Accept proposal. See backend/docs/api-request-list.md for the contract."
+description: "Accept as the task owner and award 10 points once. Repeated acceptance is safe. Implemented."
 url: "{{base_url}}/api/proposals/{{proposal_id}}/accept"
 method: POST
 headers:
   "Accept": "application/json"
+  "X-Demo-Actor": "business:{{business_id}}"
 scripts:
   - type: afterResponse
     language: text/javascript

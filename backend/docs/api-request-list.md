@@ -1,8 +1,10 @@
 # MVP pages and API contract
 
-Status: proposed contract for implementation. Only `GET /health` exists today.
-All `/api/*` routes below are planned; a current-server 404 is expected.
-This document and the Postman collection define the same routes and JSON names.
+Status: teams, proposals/offers, decisions and acceptance awards are implemented,
+along with `GET /health` and `/api/health`. Task builder, AI and catalog routes
+remain planned. See [block 2](block2.md) for implemented canonical `/offers`
+routes, +10 awards, request examples, and the shared task schema boundary.
+The Postman `/proposals` routes below remain compatible aliases.
 
 ## Pages and requests
 
@@ -62,14 +64,16 @@ for the demo. Keep milestone tracking deferred, not a mandatory screen.
   `logistics`. It is the draft's industry/category. Topic filtering is exact.
 - Readiness: `draft`, `workable`, `ready`, `priority`.
   Readiness `draft` is a score band; task status `draft` is unpublished.
-- Demo identity: one shared business workspace and five seeded teams. The team
-  dropdown supplies `team_id`. There is no implemented ownership/security
-  boundary; this is a local hackathon contract, not production authorization.
+- Demo identity for block 2: `X-Demo-Actor: team:<UUID>` on submissions,
+  `X-Demo-Actor: business:<UUID>` on review/decisions. The business UUID must
+  match `tasks.owner_id`. Optional `team_id` must match the header's team.
+  These are local demo selectors, not authenticated production identities.
+  Five demo teams are seeded once by the startup migration.
 - OpenAI credentials stay on the backend. Never send them from the frontend or
   put them in Postman. AI responses include `ai: {"provider":"openai",
   "fallback_used":false}`; a stub uses provider `stub`, fallback_used true.
 - Server should allow the agreed frontend origin with CORS when implementing
-  these routes. CORS and all domain routes are still pending.
+  these routes. CORS is still pending; block 2 domain routes are implemented.
 
 ## Lifecycle and confirmation
 
@@ -268,7 +272,10 @@ Requires confirmation of the current revision; otherwise 409. Returns task.
 
 `GET /api/teams` -> 200 list of the five demo teams:
 `{"id":"UUID","name":"Team Alpha","interests":["retail"],"skills":["backend"],
-"technologies":["Go","PostgreSQL"]}`. Same list envelope/pagination defaults.
+"technologies":["Go","PostgreSQL"],"points":0,"created_at":"2026-09-23T08:00:00Z"}`.
+Same list envelope/pagination defaults. `POST /api/teams` accepts `{"name":"..."}`
+and creates a zero-point profile. `GET /api/teams/{team_id}` returns `{"team":{...}}`
+including its current points.
 
 `POST /api/tasks/{task_id}/proposals` -> 201
 ```json
@@ -309,6 +316,13 @@ that proposal; accepting does not reject others or close the task. Repeating a
 decision is harmless; switching accepted/rejected is allowed to correct a
 mistake. Pending/no selection requires no action. No automatic team ranking.
 
+The first acceptance awards +10 to the team, once per offer. Status, award,
+team points, and task `work_status` are committed in one transaction. Repeated
+or concurrent acceptance does not award again. Changing accepted to rejected
+retains the first-acceptance award; accepting again adds nothing. A task with
+any accepted offer has `work_status=in_progress`, otherwise `open`; its
+publication status stays `published` and new offers remain allowed.
+
 ## Errors
 
 ```json
@@ -320,7 +334,8 @@ mistake. Pending/no selection requires no action. No automatic team ranking.
   }
 }
 ```
-400 malformed JSON/query; 404 unknown ID/resource or unpublished public task;
+400 malformed JSON/query; 401 missing/invalid demo actor; 403 wrong role/owner;
+404 unknown ID/resource or unpublished public task;
 409 invalid lifecycle or stale revision; 422 valid JSON with invalid field
 values; 502 invalid upstream AI response; 504 AI timeout; 500 unexpected error.
 fields may be omitted outside validation. Do not return database errors or keys.
@@ -355,11 +370,12 @@ accept proposals from multiple teams; submit an empty draft; and try publishing
 without confirmation. These are not separate automated collection requests.
 Rerunning creates fresh tasks and proposals; it does not clean up existing data.
 
-Only health can run against the current implementation. Collection/schema
-validation does not prove planned endpoints work. Test health with PostgreSQL
-running; it is 200 when connected or 503 if the database becomes unavailable.
+Health, teams and proposal review/submission can run against this implementation.
+Before block 1 is available, insert the published task fixture in `block2.md`
+and set `task_id` and `business_id` in Postman. The full builder/catalog flow
+still requires block 1. Health is 200 when connected or 503 if DB is unavailable.
 
-Five seeded drafts/cards/teams/proposals remain a separate backend milestone.
+Five teams are seeded; seeded drafts/cards/proposals remain a separate milestone.
 List pages must support empty/loading/error states before seeding.
 
 Suggested demo: create weak draft -> get questions -> answer -> generate card ->

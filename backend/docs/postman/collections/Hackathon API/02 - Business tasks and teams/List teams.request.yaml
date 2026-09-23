@@ -1,5 +1,5 @@
 $kind: http-request
-description: "Planned; returns 404 until implemented. List teams. See backend/docs/api-request-list.md for the contract."
+description: "List seeded teams and their current points. Implemented."
 url: "{{base_url}}/api/teams?limit=20&offset=0"
 method: GET
 headers:

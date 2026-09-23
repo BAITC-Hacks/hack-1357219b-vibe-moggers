@@ -29,9 +29,18 @@ if your Go server uses another port.
 - Browse catalog already includes rating sorting. To filter, add
   `topic=retail` and `readiness=priority` to its query parameters.
 
-Only `GET /health` works today. Creating this collection does not implement the
-planned routes, which currently return 404. Health returns 503 if its database
-connection becomes unavailable.
+Health, teams and proposal submission/review are implemented. Task builder/AI
+and catalog remain pending. For block 2 alone, use the SQL task fixture in
+[block2.md](../block2.md), set `task_id`, and set `business_id` to its owner UUID
+(`10000000-0000-4000-8000-000000000001` for that fixture). List teams captures
+`team_id`. Requests supply `X-Demo-Actor` for the selected team/business.
+Health returns 503 if its database connection becomes unavailable.
+
+First acceptance adds 10 points once per proposal. Repeating acceptance or
+rejecting and accepting the same proposal again never awards a second time.
+Rejecting an accepted proposal retains the original award. Check the total
+with `GET /api/teams/{{team_id}}`. The canonical `/offers` routes and examples
+are documented in `block2.md`; these `/proposals` aliases use the same data.
 
 For additional validation, reuse the requests with a title-only card to check
 low-readiness publication, or submit proposals from different teams and accept
