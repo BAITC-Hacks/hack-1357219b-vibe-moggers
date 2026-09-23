@@ -1,0 +1,27 @@
+$kind: http-request
+description: "Planned; returns 404 until implemented. Create draft. See backend/docs/api-request-list.md for the contract."
+url: "{{base_url}}/api/tasks/draft"
+method: POST
+headers:
+  "Accept": "application/json"
+  "Content-Type": "application/json"
+body:
+  type: json
+  content: |-
+    {
+      "raw_description": "Customers cannot easily compare our services.",
+      "topic": "retail"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('HTTP 201', () => pm.response.to.have.status(201));
+      pm.test('JSON response', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));
+      if (pm.response.code === 201) {
+      const task = pm.response.json().task;
+      pm.test('Task has an ID and revision', () => { pm.expect(task.id).to.be.a('string').and.not.empty; pm.expect(task.revision).to.be.a('number'); });
+      if (task && task.id && Number.isInteger(task.revision)) { pm.collectionVariables.set('task_id', task.id); pm.collectionVariables.set('revision', task.revision); }
+      pm.test('Initial draft has no confirmed points', () => { pm.expect(task.status).to.eql('draft'); pm.expect(task.rating.score).to.eql(0); pm.expect(task.confirmed_revision).to.eql(null); });
+      }
+order: 1000
